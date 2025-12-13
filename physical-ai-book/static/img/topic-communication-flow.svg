@@ -1,0 +1,9 @@
+# Placeholder for Topic Communication Flow Diagram
+
+This is a placeholder image file for the topic communication flow diagram referenced in Chapter 2.
+
+The diagram shows:
+- Publisher node publishing messages to a topic
+- Multiple subscriber nodes receiving messages from the topic
+- The asynchronous publish-subscribe pattern in ROS 2
+- How data flows between different nodes in the system

@@ -208,3 +208,11 @@ Wait for consent; never auto-create ADRs. Group related decisions (stacks, authe
 
 ## Code Standards
 See `.specify/memory/constitution.md` for code quality, testing, performance, security, and architecture principles.
+
+## Recent Changes
+- module-01-ros2-nervous-system: Added TypeScript/JavaScript (for Docusaurus), Python (for ROS 2 examples) + Docusaurus, Node.js, ROS 2 Humble, Python 3.10+
+- 003-vla-integration: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+
+## Active Technologies
+- TypeScript/JavaScript (for Docusaurus), Python (for ROS 2 examples) + Docusaurus, Node.js, ROS 2 Humble, Python 3.10+ (module-01-ros2-nervous-system)
+- Git repository, static content generation (module-01-ros2-nervous-system)

@@ -1,0 +1,455 @@
+---
+sidebar_position: 1
+slug: /module-03-ai-robot-brain/chapter-1-isaac-sdk-sim
+title: Chapter 1 - Isaac SDK & Sim
+---
+
+# Chapter 1: Isaac SDK & Sim
+
+In this chapter, we'll explore the NVIDIA Isaac ecosystem, focusing on Isaac Sim for photorealistic simulation and Isaac ROS for robot perception and control. You'll learn to set up the Isaac SDK, create synthetic data for AI training, and establish the foundation for deploying intelligent humanoid robots.
+
+## Learning Objectives
+
+By the end of this chapter, you will be able to:
+
+- Install and configure the NVIDIA Isaac SDK and Isaac Sim
+- Create photorealistic simulation environments using Isaac Sim
+- Generate synthetic data for AI training applications
+- Understand the Isaac ecosystem architecture and components
+- Set up Isaac ROS for perception and navigation
+
+## Introduction to NVIDIA Isaac
+
+NVIDIA Isaac is a comprehensive robotics platform that combines:
+
+- **Isaac Sim**: GPU-accelerated simulation with photorealistic rendering
+- **Isaac ROS**: ROS 2 packages for perception, navigation, and manipulation
+- **Isaac Apps**: Pre-built applications for common robotics tasks
+- **Deep Learning Frameworks**: Integration with NVIDIA's AI tools
+
+The Isaac platform is specifically designed for AI-powered robotics, offering:
+
+1. **Photorealistic simulation**: For generating high-quality training data
+2. **Hardware acceleration**: Leverage NVIDIA GPUs for performance
+3. **ROS 2 integration**: Seamless integration with the ROS ecosystem
+4. **Real-world deployment**: Tools for sim-to-real transfer
+
+## Installing Isaac SDK
+
+### Prerequisites
+
+Before installing Isaac, ensure you have:
+
+- NVIDIA GPU with CUDA support (RTX 4070+ recommended)
+- Ubuntu 22.04 LTS
+- ROS 2 Humble Hawksbill
+- Docker and NVIDIA Container Toolkit
+
+### Isaac Sim Installation
+
+Isaac Sim can be installed in several ways:
+
+#### Method 1: Docker Installation (Recommended)
+
+```bash
+# Pull the Isaac Sim container
+docker pull nvcr.io/nvidia/isaac-sim:4.0.0
+
+# Run Isaac Sim with GPU support
+docker run --gpus all -it --rm \
+  --network=host \
+  --env "NVIDIA_DISABLE_REQUIRE=1" \
+  --env "OMNIVERSE_APP_ENABLE_BROWSER=0" \
+  --volume $HOME/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \
+  --volume $HOME/docker/isaac-sim/cache/ov:/root/.cache/ov:rw \
+  --volume $HOME/docker/isaac-sim/cache/pip:/root/.cache/pip:rw \
+  --volume $HOME/docker/isaac-sim/cache/glcache:/root/.glcache:rw \
+  --volume $HOME/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
+  --volume $HOME/docker/isaac-sim/config:/root/.nvidia-omniverse/config:rw \
+  --volume $HOME/docker/isaac-sim/data:/workspace/isaac-sim/exts/omni.isaac.sim.python.gencode/data:ro \
+  --volume $HOME/docker/isaac-sim/assets:/assets:rw \
+  nvcr.io/nvidia/isaac-sim:4.0.0
+```
+
+#### Method 2: Native Installation
+
+For native installation, follow the official Isaac Sim documentation. The Docker approach is recommended for consistency and ease of setup.
+
+### Isaac ROS Installation
+
+Install Isaac ROS packages for perception and navigation:
+
+```bash
+# Add NVIDIA package repository
+wget https://repo.download.nvidia.com/7fa2af8a.gpg
+sudo gpg --dearmor -o /usr/share/keyrings/nvidia-isaaclinux.gpg < 7fa2af8a.gpg
+echo "deb [signed-by=/usr/share/keyrings/nvidia-isaaclinux.gpg] https://repo.download.nvidia.com/isaac_linux/ stable main" | sudo tee /etc/apt/sources.list.d/nvidia-isaaclinux.list
+
+# Update package list and install Isaac ROS packages
+sudo apt update
+sudo apt install ros-humble-isaac-ros-* ros-humble-nitros-*
+```
+
+## Isaac Sim Fundamentals
+
+### Omniverse Platform
+
+Isaac Sim is built on NVIDIA Omniverse, a simulation and collaboration platform that:
+
+- Uses USD (Universal Scene Description) for scene representation
+- Provides real-time ray tracing and global illumination
+- Supports PhysX for physics simulation
+- Enables multi-GPU rendering
+
+### Basic Isaac Sim Concepts
+
+#### USD (Universal Scene Description)
+
+USD is the foundation of Isaac Sim scenes. It's a 3D scene description that enables:
+
+- Scalable scene representation
+- Layer-based composition
+- Asset referencing and instancing
+- Animation and simulation data
+
+#### Omniverse Kit
+
+Omniverse Kit is the application framework that provides:
+
+- UI framework
+- Scene graph
+- Rendering pipeline
+- Physics simulation
+- Extensions system
+
+### Creating Your First Isaac Sim Scene
+
+Let's create a simple humanoid scene using Isaac Sim's Python API:
+
+```python
+# humanoid_scene.py
+import omni
+from omni.isaac.core import World
+from omni.isaac.core.utils.nucleus import get_assets_root_path
+from omni.isaac.core.utils.stage import add_reference_to_stage
+from omni.isaac.core.utils.prims import get_prim_at_path
+import numpy as np
+
+# Initialize Isaac Sim
+world = World(stage_units_in_meters=1.0)
+
+# Add ground plane
+world.scene.add_default_ground_plane()
+
+# Add a simple humanoid robot (using a sample asset)
+assets_root_path = get_assets_root_path()
+if assets_root_path is None:
+    print("Could not find Isaac Sim assets. Please check your installation.")
+else:
+    # Add a simple robot - in practice, you'd use a more complex humanoid model
+    robot_path = assets_root_path + "/Isaac/Robots/Franka/franka_alt_fingers.usd"
+    add_reference_to_stage(usd_path=robot_path, prim_path="/World/Robot")
+
+    # Get robot prim and add to world
+    robot_prim = get_prim_at_path("/World/Robot")
+
+    # Set initial position
+    world.scene.add_robot(robot_prim)
+
+# Reset the world
+world.reset()
+
+# Run simulation
+for i in range(1000):
+    world.step(render=True)
+
+    if i % 100 == 0:
+        print(f"Simulation step: {i}")
+
+world.clear()
+```
+
+### Isaac Sim Extensions
+
+Isaac Sim uses extensions to provide specialized functionality:
+
+- **omni.isaac.ros_bridge**: ROS 2 communication
+- **omni.isaac.range_sensor**: LiDAR and depth camera simulation
+- **omni.isaac.motion_generation**: Motion planning
+- **omni.isaac.sensor**: Various sensor types
+
+## Isaac ROS Integration
+
+### ROS 2 Bridge
+
+The ROS 2 bridge enables communication between Isaac Sim and ROS 2 nodes:
+
+```python
+# Install the extension in Isaac Sim
+import omni
+from omni.isaac.ros_bridge.scripts import isaac_ros_launcher
+
+# The bridge can be configured to publish/subscribe to specific topics
+```
+
+### Setting Up Isaac ROS Nodes
+
+Here's an example of using Isaac ROS for perception:
+
+```python
+# perception_node.py
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image, CameraInfo, PointCloud2
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import OccupancyGrid
+from std_msgs.msg import String
+
+class IsaacPerceptionNode(Node):
+    def __init__(self):
+        super().__init__('isaac_perception_node')
+
+        # Subscribe to Isaac Sim sensors
+        self.image_subscription = self.create_subscription(
+            Image,
+            '/camera/color/image_raw',
+            self.image_callback,
+            10
+        )
+
+        self.depth_subscription = self.create_subscription(
+            Image,
+            '/camera/depth/image_raw',
+            self.depth_callback,
+            10
+        )
+
+        self.imu_subscription = self.create_subscription(
+            Imu,
+            '/imu/data',
+            self.imu_callback,
+            10
+        )
+
+        # Publishers for processed data
+        self.object_detection_publisher = self.create_publisher(
+            String,
+            '/object_detections',
+            10
+        )
+
+        self.get_logger().info('Isaac Perception Node initialized')
+
+    def image_callback(self, msg):
+        # Process RGB image from Isaac Sim
+        self.get_logger().info(f'Received image: {msg.width}x{msg.height}')
+
+    def depth_callback(self, msg):
+        # Process depth image from Isaac Sim
+        self.get_logger().info(f'Received depth: {msg.width}x{msg.height}')
+
+    def imu_callback(self, msg):
+        # Process IMU data from Isaac Sim
+        self.get_logger().info(f'IMU orientation: {msg.orientation}')
+
+def main(args=None):
+    rclpy.init(args=args)
+    perception_node = IsaacPerceptionNode()
+
+    try:
+        rclpy.spin(perception_node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        perception_node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## Photorealistic Simulation
+
+### USD Scene Creation
+
+Creating photorealistic scenes involves:
+
+1. **Material creation**: Using MDL (Material Definition Language) for realistic materials
+2. **Lighting setup**: Physically-based lighting with IES profiles
+3. **Environment mapping**: High-quality environment textures
+4. **Camera configuration**: Accurate camera models
+
+### Synthetic Data Generation
+
+Isaac Sim excels at generating synthetic training data:
+
+```python
+# synthetic_data_generator.py
+import omni
+from omni.isaac.core import World
+from omni.isaac.core.utils.stage import add_reference_to_stage
+from omni.replicator.core import Replicator
+import numpy as np
+import cv2
+
+class SyntheticDataGenerator:
+    def __init__(self):
+        self.world = World(stage_units_in_meters=1.0)
+        self.replicator = Replicator()
+
+        # Set up replicator for synthetic data generation
+        self.setup_replicator()
+
+    def setup_replicator(self):
+        # Define annotation types to generate
+        self.replicator.define_sensor("/World/Camera")
+
+        # Register writers for different data types
+        from omni.replicator.isaac.scripts.writers import AnnotatedBBWriter
+        self.replicator.register_writer(AnnotatedBBWriter(output_dir="./annotations"))
+
+    def generate_dataset(self, num_samples=1000):
+        for i in range(num_samples):
+            # Randomize scene
+            self.randomize_scene()
+
+            # Capture data
+            self.replicator.render()
+
+            # Log progress
+            if i % 100 == 0:
+                print(f"Generated {i}/{num_samples} samples")
+
+    def randomize_scene(self):
+        # Randomize lighting, materials, object positions, etc.
+        # This creates diverse training data
+        pass
+
+# Usage
+generator = SyntheticDataGenerator()
+generator.generate_dataset(num_samples=5000)
+```
+
+### Domain Randomization
+
+Domain randomization helps with sim-to-real transfer:
+
+```python
+# domain_randomization.py
+import random
+from pxr import Gf, UsdLux, UsdGeom
+
+class DomainRandomizer:
+    def __init__(self, stage):
+        self.stage = stage
+        self.light_prims = []
+        self.material_prims = []
+
+    def randomize_lights(self):
+        # Randomize light intensities, colors, positions
+        for light_prim in self.light_prims:
+            light_api = UsdLux.DistantLightAPI(light_prim)
+            if light_api:
+                intensity = random.uniform(100, 1000)
+                color = Gf.Vec3f(random.random(), random.random(), random.random())
+
+                light_api.GetIntensityAttr().Set(intensity)
+                light_api.GetColorAttr().Set(color)
+
+    def randomize_materials(self):
+        # Randomize material properties like color, roughness, etc.
+        for material_prim in self.material_prims:
+            # Apply random material properties
+            pass
+
+    def randomize_textures(self):
+        # Randomize textures and surface patterns
+        pass
+```
+
+## Isaac Sim Best Practices
+
+### Performance Optimization
+
+1. **Use proxy shapes**: During scene setup, use simplified proxy shapes
+2. **Optimize USD layers**: Keep USD files modular and well-organized
+3. **Limit real-time rendering**: Use appropriate update rates for your application
+4. **GPU memory management**: Monitor and optimize GPU memory usage
+
+### Scene Organization
+
+Organize your Isaac Sim scenes effectively:
+
+```
+/World/
+├── /GroundPlane
+├── /Environment/
+│   ├── /Buildings
+│   ├── /Furniture
+│   └── /Props
+├── /Robots/
+│   ├── /Humanoid1
+│   └── /Humanoid2
+└── /Sensors/
+    ├── /Camera
+    └── /LiDAR
+```
+
+### Asset Management
+
+- Store assets in a central repository
+- Use relative paths where possible
+- Version control for USD files
+- Organize assets by type and function
+
+## Troubleshooting Common Issues
+
+### Isaac Sim Not Starting
+
+- Check GPU compatibility and drivers
+- Verify CUDA installation
+- Ensure sufficient GPU memory
+- Check for conflicting processes
+
+### ROS Bridge Issues
+
+- Verify network connectivity between Isaac Sim and ROS nodes
+- Check topic names and message types
+- Ensure correct ROS distribution
+- Validate permission settings
+
+### Performance Problems
+
+- Reduce scene complexity
+- Lower rendering quality during development
+- Use proxy shapes during scene setup
+- Monitor GPU memory usage
+
+## Summary
+
+In this chapter, we've covered the fundamentals of the NVIDIA Isaac ecosystem:
+
+- Installation and setup of Isaac Sim and Isaac ROS
+- Basic concepts of USD and Omniverse
+- Integration between Isaac Sim and ROS 2
+- Photorealistic simulation and synthetic data generation
+- Domain randomization for sim-to-real transfer
+
+The Isaac platform provides powerful tools for AI-robotics development, combining high-fidelity simulation with efficient AI training capabilities. This foundation will enable you to implement advanced perception, navigation, and control systems for humanoid robots.
+
+## Exercises
+
+1. Install Isaac Sim and run the basic humanoid scene example
+2. Create a simple scene with a humanoid robot and basic environment
+3. Set up the ROS bridge and verify communication between Isaac Sim and ROS 2
+4. Experiment with synthetic data generation using Isaac Replicator
+
+## References
+
+- [NVIDIA Isaac Documentation](https://docs.omniverse.nvidia.com/isaacsim/latest/overview.html)
+- [Isaac ROS GitHub Repository](https://github.com/NVIDIA-ISAAC-ROS)
+- [Omniverse USD Documentation](https://graphics.pixar.com/usd/release/wp_usd.html)
+
+## Next Chapter
+
+In the next chapter, we'll explore perception and manipulation systems using Isaac ROS, implementing AI-powered perception for humanoid robots.

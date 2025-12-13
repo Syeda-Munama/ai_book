@@ -1,0 +1,8 @@
+# Placeholder for ROS 2 Computation Graph Diagram
+
+This is a placeholder image file for the ROS 2 computation graph diagram referenced in Chapter 1.
+
+The diagram shows:
+- Multiple nodes communicating via topics, services, and actions
+- The relationship between different components of the robotic nervous system
+- How nodes, topics, and services interact in the ROS 2 architecture

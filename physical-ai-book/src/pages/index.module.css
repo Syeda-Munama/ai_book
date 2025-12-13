@@ -1,0 +1,169 @@
+/**
+ * CSS files with the .module.css suffix will be treated as CSS modules
+ * and scoped locally.
+ */
+
+.heroBanner {
+  padding: 4rem 0;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a0a2e 0%, #0a0a2e 100%);
+  color: white;
+}
+
+@media screen and (max-width: 996px) {
+  .heroBanner {
+    padding: 2rem;
+  }
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 2rem 0;
+}
+
+.hero__description {
+  margin: 1rem 0;
+  font-size: 1.2rem;
+  color: #e0e0e0;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Neon text effects */
+.neon-text {
+  text-shadow:
+    0 0 5px #fff,
+    0 0 10px #fff,
+    0 0 15px #8A2BE2,
+    0 0 20px #8A2BE2,
+    0 0 25px #8A2BE2,
+    0 0 30px #8A2BE2,
+    0 0 35px #8A2BE2;
+  color: white;
+  font-size: 3rem;
+  font-weight: bold;
+}
+
+.neon-text-subtle {
+  text-shadow:
+    0 0 5px #fff,
+    0 0 10px #00BFFF,
+    0 0 15px #00BFFF;
+  color: white;
+  font-size: 1.5rem;
+}
+
+.neon-button {
+  box-shadow:
+    0 0 10px rgba(138, 43, 226, 0.7),
+    0 0 20px rgba(0, 191, 255, 0.5);
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #8A2BE2 0%, #00BFFF 100%);
+  border: none;
+}
+
+.neon-button:hover {
+  box-shadow:
+    0 0 15px rgba(138, 43, 226, 0.9),
+    0 0 30px rgba(0, 191, 255, 0.7);
+  transform: translateY(-3px);
+  background: linear-gradient(135deg, #9A3CF2 0%, #18CEFF 100%);
+}
+
+/* Module grid layout */
+.modulesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-top: 3rem;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.modulesGrid .card {
+  border: 1px solid var(--ifm-color-primary-lighter);
+  box-shadow:
+    0 4px 15px rgba(138, 43, 226, 0.2),
+    0 0 10px rgba(138, 43, 226, 0.1);
+  transition: all 0.3s ease;
+  background: rgba(30, 30, 46, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.modulesGrid .card:hover {
+  box-shadow:
+    0 6px 20px rgba(138, 43, 226, 0.4),
+    0 0 15px rgba(138, 43, 226, 0.3) inset,
+    0 0 20px rgba(0, 191, 255, 0.3);
+  transform: translateY(-5px);
+}
+
+.modulesGrid .card__header h3 {
+  color: var(--ifm-color-primary-light);
+  margin: 0;
+}
+
+.modulesGrid .card__body p {
+  color: #d0d0d0;
+  margin: 0;
+}
+
+.modulesGrid .card__footer {
+  text-align: center;
+  padding: 1rem;
+}
+
+.modulesGrid .button {
+  background: linear-gradient(135deg, #8A2BE2 0%, #00BFFF 100%);
+  border: none;
+  box-shadow:
+    0 0 10px rgba(138, 43, 226, 0.5),
+    0 0 15px rgba(0, 191, 255, 0.3);
+}
+
+.modulesGrid .button:hover {
+  background: linear-gradient(135deg, #9A3CF2 0%, #18CEFF 100%);
+  box-shadow:
+    0 0 15px rgba(138, 43, 226, 0.7),
+    0 0 20px rgba(0, 191, 255, 0.5);
+}
+
+/* Glow effect container */
+.glowEffect {
+  position: relative;
+  display: inline-block;
+}
+
+.glowEffect::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
+  border-radius: 10px;
+  background: linear-gradient(45deg, #8A2BE2, #00BFFF, #8A2BE2, #00BFFF);
+  z-index: -1;
+  animation: glowing-border 3s linear infinite;
+  background-size: 300% 300%;
+}
+
+@keyframes glowing-border {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}

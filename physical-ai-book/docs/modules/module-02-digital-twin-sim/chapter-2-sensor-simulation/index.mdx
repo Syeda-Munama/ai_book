@@ -1,0 +1,556 @@
+---
+sidebar_position: 2
+slug: /module-02-digital-twin-sim/chapter-2-sensor-simulation
+title: Chapter 2 - Sensor Simulation
+---
+
+# Chapter 2: Sensor Simulation
+
+In this chapter, we'll explore how to implement realistic sensor simulation for humanoid robots in Gazebo. You'll learn to configure LiDAR, depth cameras, and IMU sensors that generate realistic data streams, bridging the gap between simulation and real-world robotics applications.
+
+## Learning Objectives
+
+By the end of this chapter, you will be able to:
+
+- Configure LiDAR sensors in Gazebo with realistic parameters
+- Set up depth camera simulation for 3D perception
+- Implement IMU sensor simulation for orientation and acceleration data
+- Validate sensor data quality and realism
+- Understand sensor fusion techniques for humanoid robotics
+
+## Introduction to Sensor Simulation
+
+Sensor simulation is a critical component of digital twin technology, allowing you to:
+
+1. **Generate training data** for perception algorithms
+2. **Test sensor fusion** without hardware limitations
+3. **Validate algorithms** in controlled environments
+4. **Prepare for sim-to-real transfer** by matching real sensor characteristics
+
+For humanoid robots, the three primary sensor types we'll focus on are:
+
+- **LiDAR**: For 2D/3D mapping and obstacle detection
+- **Depth Cameras**: For 3D perception and object recognition
+- **IMU**: For orientation, acceleration, and motion tracking
+
+## LiDAR Sensor Simulation
+
+### Setting Up a 2D LiDAR
+
+LiDAR sensors are essential for navigation and mapping. Here's how to configure a 2D LiDAR in your URDF:
+
+```xml
+<link name="laser_link">
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <cylinder radius="0.02" length="0.03"/>
+    </geometry>
+  </collision>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <cylinder radius="0.02" length="0.03"/>
+    </geometry>
+    <material name="black"/>
+  </visual>
+  <inertial>
+    <mass value="0.1"/>
+    <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+  </inertial>
+</link>
+
+<joint name="laser_joint" type="fixed">
+  <origin xyz="0.15 0 0.1" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="laser_link"/>
+</joint>
+
+<gazebo reference="laser_link">
+  <sensor name="laser" type="ray">
+    <always_on>true</always_on>
+    <visualize>true</visualize>
+    <update_rate>40</update_rate>
+    <ray>
+      <scan>
+        <horizontal>
+          <samples>720</samples>
+          <resolution>1</resolution>
+          <min_angle>-1.570796</min_angle>
+          <max_angle>1.570796</max_angle>
+        </horizontal>
+      </scan>
+      <range>
+        <min>0.1</min>
+        <max>30.0</max>
+        <resolution>0.01</resolution>
+      </range>
+    </ray>
+    <plugin name="laser_controller" filename="libgazebo_ros_ray_sensor.so">
+      <ros>
+        <namespace>/humanoid</namespace>
+        <remapping>~/out:=scan</remapping>
+      </ros>
+      <output_type>sensor_msgs/LaserScan</output_type>
+    </plugin>
+  </sensor>
+</gazebo>
+```
+
+### 3D LiDAR Configuration
+
+For more advanced applications, you might need a 3D LiDAR. Here's an example configuration:
+
+```xml
+<gazebo reference="laser_link">
+  <sensor name="velodyne_sensor" type="ray">
+    <always_on>true</always_on>
+    <visualize>false</visualize>
+    <update_rate>10</update_rate>
+    <ray>
+      <scan>
+        <horizontal>
+          <samples>800</samples>
+          <resolution>1</resolution>
+          <min_angle>-3.14159</min_angle>
+          <max_angle>3.14159</max_angle>
+        </horizontal>
+        <vertical>
+          <samples>32</samples>
+          <resolution>1</resolution>
+          <min_angle>-0.5236</min_angle>
+          <max_angle>0.1745</max_angle>
+        </vertical>
+      </scan>
+      <range>
+        <min>0.1</min>
+        <max>100.0</max>
+        <resolution>0.01</resolution>
+      </range>
+    </ray>
+    <plugin name="velodyne_controller" filename="libgazebo_ros_velodyne_gpu_laser.so">
+      <ros>
+        <namespace>/humanoid</namespace>
+        <remapping>~/out:=points2</remapping>
+      </ros>
+      <min_range>0.1</min_range>
+      <max_range>100.0</max_range>
+      <gaussian_noise>0.01</gaussian_noise>
+    </plugin>
+  </sensor>
+</gazebo>
+```
+
+## Depth Camera Simulation
+
+### RGB-D Camera Setup
+
+Depth cameras provide crucial 3D perception capabilities. Here's how to configure a depth camera in Gazebo:
+
+```xml
+<link name="camera_link">
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.02 0.08 0.04"/>
+    </geometry>
+  </collision>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.02 0.08 0.04"/>
+    </geometry>
+    <material name="black"/>
+  </visual>
+  <inertial>
+    <mass value="0.1"/>
+    <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+  </inertial>
+</link>
+
+<joint name="camera_joint" type="fixed">
+  <origin xyz="0.15 0 0.2" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="camera_link"/>
+</joint>
+
+<gazebo reference="camera_link">
+  <sensor name="camera" type="depth">
+    <always_on>true</always_on>
+    <visualize>true</visualize>
+    <update_rate>30</update_rate>
+    <camera>
+      <horizontal_fov>1.047</horizontal_fov>
+      <image>
+        <format>R8G8B8</format>
+        <width>640</width>
+        <height>480</height>
+      </image>
+      <clip>
+        <near>0.1</near>
+        <far>10</far>
+      </clip>
+    </camera>
+    <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+      <ros>
+        <namespace>/humanoid</namespace>
+        <remapping>image_raw:=/camera/image_raw</remapping>
+        <remapping>camera_info:=/camera/camera_info</remapping>
+        <remapping>depth/image_raw:=/camera/depth/image_raw</remapping>
+      </ros>
+    </plugin>
+  </sensor>
+</gazebo>
+```
+
+### Camera Parameters and Calibration
+
+To make your camera simulation realistic, you need to properly configure the intrinsic and extrinsic parameters:
+
+- **Intrinsic parameters**: Focal length, principal point, distortion coefficients
+- **Extrinsic parameters**: Position and orientation relative to the robot
+
+These parameters should match your real camera as closely as possible for effective sim-to-real transfer.
+
+## IMU Sensor Simulation
+
+### IMU Configuration
+
+IMU sensors are crucial for humanoid balance and navigation. Here's how to configure an IMU in Gazebo:
+
+```xml
+<link name="imu_link">
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.01 0.01 0.01"/>
+    </geometry>
+  </collision>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.01 0.01 0.01"/>
+    </geometry>
+    <material name="red"/>
+  </visual>
+  <inertial>
+    <mass value="0.01"/>
+    <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
+  </inertial>
+</link>
+
+<joint name="imu_joint" type="fixed">
+  <origin xyz="0 0 0.1" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="imu_link"/>
+</joint>
+
+<gazebo reference="imu_link">
+  <sensor name="imu_sensor" type="imu">
+    <always_on>true</always_on>
+    <update_rate>100</update_rate>
+    <visualize>false</visualize>
+    <imu>
+      <angular_velocity>
+        <x>
+          <noise type="gaussian">
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </x>
+        <y>
+          <noise type="gaussian">
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </y>
+        <z>
+          <noise type="gaussian">
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </z>
+      </angular_velocity>
+      <linear_acceleration>
+        <x>
+          <noise type="gaussian">
+            <mean>0.0</mean>
+            <stddev>0.017</stddev>
+          </noise>
+        </x>
+        <y>
+          <noise type="gaussian">
+            <mean>0.0</mean>
+            <stddev>0.017</stddev>
+          </noise>
+        </y>
+        <z>
+          <noise type="gaussian">
+            <mean>0.0</mean>
+            <stddev>0.017</stddev>
+          </noise>
+        </z>
+      </linear_acceleration>
+    </imu>
+    <plugin name="imu_controller" filename="libgazebo_ros_imu.so">
+      <ros>
+        <namespace>/humanoid</namespace>
+        <remapping>~/out:=imu</remapping>
+      </ros>
+    </plugin>
+  </sensor>
+</gazebo>
+```
+
+## Sensor Data Processing Pipeline
+
+### Accessing Sensor Data in ROS 2
+
+Once your sensors are configured, you can access the data in ROS 2 using standard message types:
+
+```python
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import LaserScan, Image, Imu, CameraInfo
+from cv_bridge import CvBridge
+import numpy as np
+
+class SensorDataProcessor(Node):
+    def __init__(self):
+        super().__init__('sensor_data_processor')
+
+        # Initialize CvBridge for image processing
+        self.bridge = CvBridge()
+
+        # Subscribe to sensor topics
+        self.laser_subscription = self.create_subscription(
+            LaserScan,
+            '/humanoid/scan',
+            self.laser_callback,
+            10)
+
+        self.camera_subscription = self.create_subscription(
+            Image,
+            '/humanoid/camera/image_raw',
+            self.camera_callback,
+            10)
+
+        self.imu_subscription = self.create_subscription(
+            Imu,
+            '/humanoid/imu',
+            self.imu_callback,
+            10)
+
+        self.depth_subscription = self.create_subscription(
+            Image,
+            '/humanoid/camera/depth/image_raw',
+            self.depth_callback,
+            10)
+
+    def laser_callback(self, msg):
+        # Process LiDAR data
+        ranges = np.array(msg.ranges)
+        # Filter out invalid ranges
+        valid_ranges = ranges[(ranges >= msg.range_min) & (ranges <= msg.range_max)]
+
+        # Example: Find closest obstacle
+        if len(valid_ranges) > 0:
+            min_distance = np.min(valid_ranges)
+            self.get_logger().info(f'Closest obstacle: {min_distance:.2f}m')
+
+    def camera_callback(self, msg):
+        # Convert ROS Image to OpenCV
+        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+
+        # Process image (example: detect edges)
+        # ... your image processing code here ...
+
+    def imu_callback(self, msg):
+        # Process IMU data
+        orientation = msg.orientation
+        angular_velocity = msg.angular_velocity
+        linear_acceleration = msg.linear_acceleration
+
+        # Example: Check if robot is upright
+        # ... your balance control code here ...
+
+    def depth_callback(self, msg):
+        # Process depth image
+        depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='32FC1')
+
+        # Example: Find depth at center of image
+        height, width = depth_image.shape
+        center_depth = depth_image[height//2, width//2]
+        self.get_logger().info(f'Center depth: {center_depth:.2f}m')
+
+def main(args=None):
+    rclpy.init(args=args)
+    processor = SensorDataProcessor()
+
+    try:
+        rclpy.spin(processor)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        processor.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## Sensor Fusion Techniques
+
+### Combining Multiple Sensors
+
+For humanoid robots, sensor fusion is essential for robust perception. Here's a simple example of combining IMU and LiDAR data:
+
+```python
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import LaserScan, Imu
+from geometry_msgs.msg import Vector3
+from std_msgs.msg import Float32
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+
+class SensorFusionNode(Node):
+    def __init__(self):
+        super().__init__('sensor_fusion_node')
+
+        # Initialize variables to store sensor data
+        self.imu_orientation = None
+        self.laser_ranges = None
+
+        # Subscribe to sensors
+        self.imu_subscription = self.create_subscription(
+            Imu, '/humanoid/imu', self.imu_callback, 10)
+        self.laser_subscription = self.create_subscription(
+            LaserScan, '/humanoid/scan', self.laser_callback, 10)
+
+        # Publisher for fused data
+        self.fused_publisher = self.create_publisher(Float32, '/humanoid/balance_score', 10)
+
+        # Timer for fusion processing
+        self.timer = self.create_timer(0.1, self.fusion_callback)
+
+    def imu_callback(self, msg):
+        # Store IMU orientation
+        self.imu_orientation = msg.orientation
+
+    def laser_callback(self, msg):
+        # Store laser ranges
+        self.laser_ranges = np.array(msg.ranges)
+
+    def fusion_callback(self):
+        if self.imu_orientation is None or self.laser_ranges is None:
+            return
+
+        # Calculate balance score based on IMU (orientation) and LiDAR (obstacle avoidance)
+        # Extract roll and pitch from quaternion
+        quat = [self.imu_orientation.x, self.imu_orientation.y,
+                self.imu_orientation.z, self.imu_orientation.w]
+        r = R.from_quat(quat)
+        roll, pitch, yaw = r.as_euler('xyz')
+
+        # Calculate balance score (0 = perfectly balanced, higher = less balanced)
+        orientation_score = abs(roll) + abs(pitch)
+
+        # Calculate obstacle score based on LiDAR
+        if len(self.laser_ranges) > 0:
+            valid_ranges = self.laser_ranges[(self.laser_ranges >= 0.1) &
+                                           (self.laser_ranges <= 10.0)]
+            if len(valid_ranges) > 0:
+                min_distance = np.min(valid_ranges)
+                obstacle_score = max(0, 2.0 - min_distance)  # Higher score when close to obstacles
+            else:
+                obstacle_score = 0
+        else:
+            obstacle_score = 0
+
+        # Combined balance score
+        balance_score = Float32()
+        balance_score.data = orientation_score + obstacle_score
+        self.fused_publisher.publish(balance_score)
+
+        self.get_logger().info(f'Balance Score: {balance_score.data:.2f} '
+                              f'(Orientation: {orientation_score:.2f}, '
+                              f'Obstacle: {obstacle_score:.2f})')
+
+def main(args=None):
+    rclpy.init(args=args)
+    fusion_node = SensorFusionNode()
+
+    try:
+        rclpy.spin(fusion_node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        fusion_node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## Validating Sensor Data Quality
+
+### Checking Sensor Performance
+
+To ensure your simulated sensors provide realistic data, implement validation checks:
+
+1. **Range validation**: Verify sensor readings are within expected ranges
+2. **Temporal consistency**: Check that sensor data changes smoothly over time
+3. **Spatial consistency**: Validate that sensor readings make sense given the environment
+4. **Noise characteristics**: Ensure simulated noise matches real sensor properties
+
+### Debugging Sensor Issues
+
+Common sensor simulation issues and solutions:
+
+- **No data**: Check Gazebo plugin loading and ROS topic connections
+- **Inconsistent data**: Verify physics update rates and sensor update frequencies
+- **Unrealistic readings**: Adjust noise parameters and sensor configuration
+
+## Best Practices for Sensor Simulation
+
+### Realistic Simulation Parameters
+
+1. **Match real hardware specifications**: Use parameters that closely match your physical sensors
+2. **Add appropriate noise**: Include realistic noise models to make training more robust
+3. **Consider computational cost**: Balance realism with simulation performance
+4. **Validate with real data**: Compare simulated data with real sensor readings when possible
+
+### Performance Optimization
+
+1. **Reduce update rates**: Lower update rates for sensors that don't need high frequency
+2. **Optimize visual processing**: Use lower resolution images when possible
+3. **Limit sensor ranges**: Use minimum necessary sensor ranges for your application
+
+## Summary
+
+In this chapter, we've explored sensor simulation for humanoid robots in Gazebo. You learned how to:
+
+- Configure realistic LiDAR, depth camera, and IMU sensors
+- Access and process sensor data in ROS 2
+- Implement sensor fusion techniques for enhanced perception
+- Validate sensor data quality and realism
+
+Sensor simulation is crucial for developing robust perception and control systems for humanoid robots. The realistic sensor data you generate in simulation will be invaluable for training and testing your robot's capabilities before deployment on physical hardware.
+
+## Exercises
+
+1. Add a 3D LiDAR to your humanoid robot model and test its performance in various environments
+2. Implement a simple object detection pipeline using your simulated camera data
+3. Create a balance control system that uses IMU data to keep your humanoid upright
+4. Develop a sensor fusion algorithm that combines LiDAR and IMU data for navigation
+
+## References
+
+- [Gazebo Sensor Documentation](http://gazebosim.org/tutorials?tut=ros_gzplugins#Sensor)
+- [ROS 2 Sensor Message Types](https://docs.ros.org/en/humble/packages.html#sensor-msgs)
+- [Sensor Fusion Techniques](https://en.wikipedia.org/wiki/Sensor_fusion)
+
+## Next Chapter
+
+In the next chapter, we'll explore Unity integration for high-fidelity rendering and visualization, learning how to connect your Gazebo physics simulation with Unity's advanced graphics capabilities.

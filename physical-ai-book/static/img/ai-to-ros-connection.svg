@@ -1,0 +1,8 @@
+# Placeholder for AI to ROS Connection Diagram
+
+This is a placeholder image file for the diagram showing how AI agents connect to ROS controllers referenced in Chapter 1.
+
+The diagram shows:
+- The bridge between Python AI agents and ROS controllers
+- How abstract algorithms interact with physical robot control
+- The relationship between high-level AI and low-level robot control

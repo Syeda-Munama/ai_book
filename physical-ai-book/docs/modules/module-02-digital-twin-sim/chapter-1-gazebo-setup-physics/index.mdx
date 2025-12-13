@@ -1,0 +1,344 @@
+---
+sidebar_position: 1
+slug: /module-02-digital-twin-sim/chapter-1-gazebo-setup-physics
+title: Chapter 1 - Gazebo Setup & Physics
+---
+
+# Chapter 1: Gazebo Setup & Physics
+
+In this chapter, we'll explore the fundamentals of physics-based simulation using Gazebo. You'll learn how to set up a realistic simulation environment for humanoid robots, including gravity, collision detection, and material properties. This foundation is essential for all subsequent simulation work.
+
+## Learning Objectives
+
+By the end of this chapter, you will be able to:
+
+- Install and configure Gazebo for humanoid robot simulation
+- Create a basic humanoid model in Gazebo with proper physics properties
+- Configure gravity and collision detection for realistic movement
+- Understand the physics simulation pipeline and its importance for robotics
+
+## Introduction to Gazebo
+
+Gazebo is a powerful physics simulator that provides accurate and efficient simulation of robots in complex environments. For humanoid robotics, Gazebo offers:
+
+- Realistic physics simulation with accurate gravity, friction, and collision detection
+- Support for complex robot models with multiple degrees of freedom
+- Integration with ROS 2 for seamless communication and control
+- Extensive sensor simulation capabilities
+
+### Why Physics Simulation Matters
+
+Physics simulation is crucial for robotics development because it allows you to:
+
+1. **Test algorithms safely** without risking expensive hardware
+2. **Iterate quickly** on control algorithms and behaviors
+3. **Generate training data** for machine learning applications
+4. **Validate designs** before physical implementation
+
+## Setting Up Gazebo for Humanoid Robots
+
+### Installation Prerequisites
+
+Before installing Gazebo, ensure you have ROS 2 Humble installed on Ubuntu 22.04. Then install Gazebo with the following commands:
+
+```bash
+sudo apt update
+sudo apt install ros-humble-gazebo-*
+sudo apt install ros-humble-gazebo-ros-pkgs
+```
+
+### Basic Gazebo Launch
+
+To verify your installation, launch Gazebo with:
+
+```bash
+gz sim
+```
+
+This will open the Gazebo simulation environment where you can begin creating your humanoid simulation.
+
+## Creating a Basic Humanoid Model
+
+### URDF Model Setup
+
+For humanoid robots, we'll use URDF (Unified Robot Description Format) to define our robot model. Here's a basic example:
+
+```xml
+<?xml version="1.0"?>
+<robot name="simple_humanoid">
+  <!-- Base link -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.3 0.2 0.1"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.3 0.2 0.1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="10.0"/>
+      <inertia ixx="1.0" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+    </inertial>
+  </link>
+
+  <!-- Head link -->
+  <link name="head">
+    <visual>
+      <geometry>
+        <sphere radius="0.1"/>
+      </geometry>
+      <material name="white">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <sphere radius="0.1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="2.0"/>
+      <inertia ixx="0.02" ixy="0.0" ixz="0.0" iyy="0.02" iyz="0.0" izz="0.02"/>
+    </inertial>
+  </link>
+
+  <!-- Joint connecting head to base -->
+  <joint name="neck_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="head"/>
+    <origin xyz="0 0 0.15" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="100" velocity="1"/>
+  </joint>
+</robot>
+```
+
+### Loading the Model into Gazebo
+
+To load this model into Gazebo, you'll need to create a launch file that uses the `spawn_entity` service:
+
+```python
+#!/usr/bin/env python3
+
+import os
+from launch import LaunchDescription
+from launch.actions import ExecuteProcess
+from launch_ros.actions import Node
+from ament_index_python.packages import get_package_share_directory
+
+def generate_launch_description():
+    # Get URDF path
+    urdf_file = os.path.join(
+        get_package_share_directory('your_robot_description'),
+        'urdf',
+        'simple_humanoid.urdf'
+    )
+
+    with open(urdf_file, 'r') as infp:
+        robot_desc = infp.read()
+
+    # Spawn robot in Gazebo
+    spawn_entity = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=['-topic', 'robot_description',
+                  '-entity', 'simple_humanoid'],
+        output='screen'
+    )
+
+    # Launch Gazebo
+    gazebo = ExecuteProcess(
+        cmd=['gz sim', '-r', 'empty.sdf'],
+        output='screen'
+    )
+
+    # Robot state publisher
+    robot_state_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        output='both',
+        parameters=[{'use_sim_time': True, 'robot_description': robot_desc}],
+    )
+
+    return LaunchDescription([
+        gazebo,
+        robot_state_publisher,
+        spawn_entity,
+    ])
+```
+
+## Physics Configuration
+
+### Gravity and World Setup
+
+Gazebo simulates realistic physics by default, including gravity. The default gravity is set to Earth's gravity (9.8 m/s²) pointing downward. You can customize this in your world file:
+
+```xml
+<sdf version="1.7">
+  <world name="humanoid_world">
+    <!-- Physics engine configuration -->
+    <physics type="ode">
+      <gravity>0 0 -9.8</gravity>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <!-- Include a ground plane -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- Include a sun for lighting -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+  </world>
+</sdf>
+```
+
+### Collision Detection
+
+Gazebo provides accurate collision detection between objects. The collision properties in your URDF determine how objects interact:
+
+- **Collision geometry**: Defines the shape used for collision detection
+- **Material properties**: Affect friction and restitution (bounciness)
+- **Mass and inertia**: Affect how objects respond to forces
+
+### Friction and Material Properties
+
+To make your humanoid robot behave realistically, you need to set appropriate friction coefficients:
+
+```xml
+<gazebo reference="base_link">
+  <mu1>0.5</mu1>
+  <mu2>0.5</mu2>
+  <kp>1000000.0</kp>
+  <kd>1.0</kd>
+</gazebo>
+```
+
+## Creating a Simulation Environment
+
+### Environment Building
+
+A realistic simulation environment is crucial for training and testing humanoid robots. Consider these elements:
+
+1. **Terrain variations**: Different surfaces to test locomotion
+2. **Obstacles**: Objects for navigation and manipulation tasks
+3. **Lighting**: Realistic lighting conditions for sensor simulation
+4. **Dynamic elements**: Moving objects to test real-time responses
+
+### Example Environment
+
+Here's a simple environment file that includes obstacles for humanoid testing:
+
+```xml
+<sdf version="1.7">
+  <world name="humanoid_test_world">
+    <physics type="ode">
+      <gravity>0 0 -9.8</gravity>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <!-- Ground plane -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
+
+    <!-- Lighting -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <!-- Obstacles for humanoid navigation -->
+    <model name="obstacle_1">
+      <pose>2 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.5 0.5 1</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.5 0.5 1</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.8 0.2 0.2 1</ambient>
+            <diffuse>0.8 0.2 0.2 1</diffuse>
+          </material>
+        </visual>
+        <inertial>
+          <mass>10.0</mass>
+          <inertia>
+            <ixx>1.0</ixx>
+            <ixy>0.0</ixy>
+            <ixz>0.0</ixz>
+            <iyy>1.0</iyy>
+            <iyz>0.0</iyz>
+            <izz>1.0</izz>
+          </inertia>
+        </inertial>
+      </link>
+    </model>
+  </world>
+</sdf>
+```
+
+## Best Practices for Physics Simulation
+
+### Performance Optimization
+
+1. **Use appropriate time steps**: Smaller time steps increase accuracy but decrease performance
+2. **Optimize collision geometry**: Use simpler shapes when high precision isn't needed
+3. **Limit real-time factor**: Balance between simulation speed and accuracy
+4. **Use fixed joints when possible**: Fixed joints are more efficient than revolute joints
+
+### Realism vs. Performance
+
+When setting up your simulation, consider the trade-offs between realism and performance:
+
+- **High realism**: More accurate physics, complex collision geometry, detailed models
+- **High performance**: Simplified physics, basic collision shapes, faster computation
+
+Choose the balance that best fits your specific application requirements.
+
+## Summary
+
+In this chapter, we've covered the fundamentals of setting up physics-based humanoid simulation in Gazebo. You learned how to:
+
+- Install and configure Gazebo for humanoid robotics
+- Create basic humanoid models with proper physics properties
+- Configure gravity, collision detection, and material properties
+- Build realistic simulation environments
+
+This foundation will serve you well as we move into more advanced topics like sensor simulation in the next chapter. The physics simulation you've set up here is crucial for developing and testing humanoid robot behaviors safely and efficiently.
+
+## Exercises
+
+1. Create a simple humanoid model with at least 5 links (head, torso, two arms, two legs) and load it into Gazebo
+2. Experiment with different gravity settings to see how they affect your robot's movement
+3. Create a simple obstacle course and test your humanoid's ability to interact with objects
+4. Adjust friction coefficients and observe how they affect the robot's locomotion
+
+## References
+
+- [Gazebo Documentation](http://gazebosim.org/)
+- [ROS 2 with Gazebo Guide](https://classic.gazebosim.org/tutorials?tut=ros2_overview)
+- [URDF Documentation](http://wiki.ros.org/urdf)
+
+## Next Chapter
+
+In the next chapter, we'll explore sensor simulation, learning how to implement realistic sensors for LiDAR, cameras, and IMUs in your humanoid robot simulation.

@@ -1,0 +1,73 @@
+# Docker Compose file for Isaac Sim integration testing
+version: '3.8'
+
+services:
+  vla-testing:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vla-testing
+    privileged: true
+    environment:
+      - DISPLAY=${DISPLAY:-}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - ROS_DOMAIN_ID=0
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - .:/workspace:rw
+      - /dev/dri:/dev/dri
+    network_mode: host
+    devices:
+      - /dev/dri:/dev/dri
+    command: >
+      bash -c "
+        source /opt/ros/humble/setup.bash &&
+        cd /workspace &&
+        bash
+      "
+
+  isaac-sim:
+    image: nvidia/isaac-sim:4.0.0
+    container_name: isaac-sim
+    privileged: true
+    environment:
+      - DISPLAY=${DISPLAY:-}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - QT_X11_NO_MITSHM=1
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - .:/workspace:rw
+      - /usr/share/vulkan/icd.d:/usr/share/vulkan/icd.d:ro
+      - /usr/lib/x86_64-linux-gnu/libGLX_nvidia.so.1:/usr/lib/x86_64-linux-gnu/libGLX_nvidia.so.1:ro
+      - /usr/lib/x86_64-linux-gnu/libGL.so.1:/usr/lib/x86_64-linux-gnu/libGL.so.1:ro
+    network_mode: host
+    ports:
+      - "5000:5000"
+      - "8211:8211/udp"
+    devices:
+      - /dev/dri:/dev/dri
+      - /dev/snd:/dev/snd
+    stdin_open: true
+    tty: true
+    command: ["bash", "-c", "/isaac-sim/python.sh -c 'from omni.isaac.kit import SimulationApp; import omni; simulation_app = SimulationApp(); simulation_app.close()'" ]
+
+  ros-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ros-bridge
+    environment:
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_cyclonedx
+    network_mode: host
+    depends_on:
+      - vla-testing
+    command: >
+      bash -c "
+        source /opt/ros/humble/setup.bash &&
+        apt-get update &&
+        apt-get install -y ros-humble-isaac-ros-* &&
+        ros2 run demo_nodes_cpp talker
+      "

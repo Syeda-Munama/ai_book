@@ -1,0 +1,9 @@
+# Placeholder for Service Communication Diagram
+
+This is a placeholder image file for the service communication diagram referenced in Chapter 2.
+
+The diagram shows:
+- Service client making a request to a service server
+- The synchronous request-response pattern in ROS 2
+- How services enable direct communication between nodes
+- The difference between service communication and topic communication

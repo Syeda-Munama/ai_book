@@ -1,0 +1,858 @@
+---
+sidebar_position: 2
+slug: /module-03-ai-robot-brain/chapter-2-perception-manipulation
+title: Chapter 2 - Perception & Manipulation
+---
+
+# Chapter 2: Perception & Manipulation
+
+In this chapter, we'll explore AI-powered perception and manipulation systems for humanoid robots using the NVIDIA Isaac ecosystem. You'll learn to implement computer vision algorithms, 3D perception, and manipulation planning that enable humanoid robots to interact intelligently with their environment.
+
+## Learning Objectives
+
+By the end of this chapter, you will be able to:
+
+- Implement AI-based perception pipelines using Isaac ROS
+- Create 3D perception systems for object detection and localization
+- Plan and execute manipulation tasks for humanoid robots
+- Integrate perception and manipulation for complex tasks
+- Deploy perception systems on NVIDIA Jetson platforms
+
+## Introduction to AI-Based Perception
+
+Perception is the foundation of intelligent robot behavior, enabling robots to:
+
+1. **Understand their environment**: Detect and classify objects, people, and obstacles
+2. **Localize themselves**: Determine their position and orientation in space
+3. **Plan actions**: Make decisions based on environmental understanding
+4. **Interact safely**: Avoid collisions and operate in human environments
+
+For humanoid robots, perception must be robust enough to handle complex, dynamic environments while providing real-time performance.
+
+## Isaac ROS Perception Pipeline
+
+### Isaac ROS Perception Packages
+
+The Isaac ROS perception stack includes:
+
+- **Isaac ROS Apriltag**: Visual fiducial detection
+- **Isaac ROS Stereo DNN**: Stereo vision with deep learning
+- **Isaac ROS Visual Slam**: Visual SLAM implementation
+- **Isaac ROS Object Detection**: 2D and 3D object detection
+- **Isaac ROS Image Pipeline**: Image processing and calibration
+
+### Setting Up the Perception Pipeline
+
+Here's how to set up a basic perception pipeline using Isaac ROS:
+
+```python
+# perception_pipeline.py
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image, CameraInfo
+from geometry_msgs.msg import PoseStamped
+from vision_msgs.msg import Detection2DArray, Detection3DArray
+from std_msgs.msg import String
+from cv_bridge import CvBridge
+import cv2
+import numpy as np
+
+class IsaacPerceptionPipeline(Node):
+    def __init__(self):
+        super().__init__('isaac_perception_pipeline')
+
+        # Initialize CvBridge for image processing
+        self.bridge = CvBridge()
+
+        # Subscribe to camera topics from Isaac Sim
+        self.image_subscription = self.create_subscription(
+            Image,
+            '/camera/color/image_raw',
+            self.image_callback,
+            10
+        )
+
+        self.camera_info_subscription = self.create_subscription(
+            CameraInfo,
+            '/camera/color/camera_info',
+            self.camera_info_callback,
+            10
+        )
+
+        # Publishers for perception results
+        self.object_detections_publisher = self.create_publisher(
+            Detection2DArray,
+            '/object_detections',
+            10
+        )
+
+        self.object_3d_publisher = self.create_publisher(
+            Detection3DArray,
+            '/object_detections_3d',
+            10
+        )
+
+        self.status_publisher = self.create_publisher(
+            String,
+            '/perception_status',
+            10
+        )
+
+        # Camera parameters
+        self.camera_matrix = None
+        self.distortion_coeffs = None
+
+        self.get_logger().info('Isaac Perception Pipeline initialized')
+
+    def camera_info_callback(self, msg):
+        # Extract camera parameters
+        self.camera_matrix = np.array(msg.k).reshape(3, 3)
+        self.distortion_coeffs = np.array(msg.d)
+
+    def image_callback(self, msg):
+        # Convert ROS Image to OpenCV
+        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+
+        # Perform perception tasks
+        detections_2d = self.detect_objects_2d(cv_image)
+        detections_3d = self.convert_to_3d(detections_2d)
+
+        # Publish results
+        self.object_detections_publisher.publish(detections_2d)
+        self.object_3d_publisher.publish(detections_3d)
+
+        # Publish status
+        status_msg = String()
+        status_msg.data = f'Processed image with {len(detections_2d.detections)} detections'
+        self.status_publisher.publish(status_msg)
+
+    def detect_objects_2d(self, image):
+        # Placeholder for object detection
+        # In practice, use Isaac ROS DNN packages or custom models
+        detections = Detection2DArray()
+
+        # Example: Simple color-based detection
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+        # Define color range for red objects
+        lower_red = np.array([0, 50, 50])
+        upper_red = np.array([10, 255, 255])
+        mask1 = cv2.inRange(hsv, lower_red, upper_red)
+
+        lower_red = np.array([170, 50, 50])
+        upper_red = np.array([180, 255, 255])
+        mask2 = cv2.inRange(hsv, lower_red, upper_red)
+
+        mask = mask1 + mask2
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        for contour in contours:
+            if cv2.contourArea(contour) > 100:  # Filter small contours
+                x, y, w, h = cv2.boundingRect(contour)
+
+                detection = Detection2D()
+                detection.bbox.center.x = x + w/2
+                detection.bbox.center.y = y + h/2
+                detection.bbox.size_x = w
+                detection.bbox.size_y = h
+
+                # Add classification (in practice, use trained classifier)
+                detection.results.append(ObjectHypothesisWithPose())
+                detection.results[0].id = 'red_object'
+                detection.results[0].score = 0.8
+
+                detections.detections.append(detection)
+
+        return detections
+
+    def convert_to_3d(self, detections_2d):
+        # Convert 2D detections to 3D using depth information
+        # This is a simplified example - in practice, use Isaac ROS stereo packages
+        detections_3d = Detection3DArray()
+
+        # For each 2D detection, estimate 3D position
+        for detection in detections_2d.detections:
+            detection_3d = Detection3D()
+
+            # Placeholder: assume fixed depth for demonstration
+            # In practice, use depth image to get accurate 3D positions
+            center_x = int(detection.bbox.center.x)
+            center_y = int(detection.bbox.center.y)
+
+            # This would use actual depth information in a real implementation
+            depth = 1.0  # meters
+
+            # Convert 2D pixel coordinates to 3D world coordinates
+            if self.camera_matrix is not None:
+                # Use camera matrix to convert pixel to world coordinates
+                u = center_x
+                v = center_y
+                fx = self.camera_matrix[0, 0]
+                fy = self.camera_matrix[1, 1]
+                cx = self.camera_matrix[0, 2]
+                cy = self.camera_matrix[1, 2]
+
+                # Calculate 3D position (simplified)
+                x = (u - cx) * depth / fx
+                y = (v - cy) * depth / fy
+                z = depth
+
+                detection_3d.bbox.center.position.x = x
+                detection_3d.bbox.center.position.y = y
+                detection_3d.bbox.center.position.z = z
+                detection_3d.bbox.center.orientation.w = 1.0  # No rotation
+
+                # Copy classification from 2D detection
+                detection_3d.results = detection.results
+
+                detections_3d.detections.append(detection_3d)
+
+        return detections_3d
+
+def main(args=None):
+    rclpy.init(args=args)
+    perception_pipeline = IsaacPerceptionPipeline()
+
+    try:
+        rclpy.spin(perception_pipeline)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        perception_pipeline.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## 3D Perception and Object Detection
+
+### Stereo Vision with Isaac ROS
+
+Isaac ROS provides powerful stereo vision capabilities:
+
+```python
+# stereo_perception.py
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image, CameraInfo
+from stereo_msgs.msg import DisparityImage
+from vision_msgs.msg import Detection3DArray
+import numpy as np
+
+class StereoPerceptionNode(Node):
+    def __init__(self):
+        super().__init__('stereo_perception_node')
+
+        # Subscribe to stereo camera pair
+        self.left_subscription = self.create_subscription(
+            Image,
+            '/stereo/left/image_rect_color',
+            self.left_image_callback,
+            10
+        )
+
+        self.right_subscription = self.create_subscription(
+            Image,
+            '/stereo/right/image_rect_color',
+            self.right_image_callback,
+            10
+        )
+
+        self.left_info_subscription = self.create_subscription(
+            CameraInfo,
+            '/stereo/left/camera_info',
+            self.left_info_callback,
+            10
+        )
+
+        self.right_info_subscription = self.create_subscription(
+            CameraInfo,
+            '/stereo/right/camera_info',
+            self.right_info_callback,
+            10
+        )
+
+        # Publisher for 3D detections
+        self.detections_3d_publisher = self.create_publisher(
+            Detection3DArray,
+            '/stereo_3d_detections',
+            10
+        )
+
+        # Storage for stereo images
+        self.left_image = None
+        self.right_image = None
+        self.left_camera_info = None
+        self.right_camera_info = None
+
+        # Stereo matcher (using OpenCV as example)
+        self.stereo_matcher = cv2.StereoSGBM_create(
+            minDisparity=0,
+            numDisparities=64,
+            blockSize=11,
+            P1=8 * 3 * 11**2,
+            P2=32 * 3 * 11**2
+        )
+
+    def left_image_callback(self, msg):
+        self.left_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        self.process_stereo_if_ready()
+
+    def right_image_callback(self, msg):
+        self.right_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        self.process_stereo_if_ready()
+
+    def left_info_callback(self, msg):
+        self.left_camera_info = msg
+
+    def right_info_callback(self, msg):
+        self.right_camera_info = msg
+
+    def process_stereo_if_ready(self):
+        if (self.left_image is not None and
+            self.right_image is not None and
+            self.left_camera_info is not None and
+            self.right_camera_info is not None):
+
+            # Compute disparity map
+            gray_left = cv2.cvtColor(self.left_image, cv2.COLOR_BGR2GRAY)
+            gray_right = cv2.cvtColor(self.right_image, cv2.COLOR_BGR2GRAY)
+
+            disparity = self.stereo_matcher.compute(gray_left, gray_right)
+            disparity = disparity.astype(np.float32) / 16.0  # Convert to float
+
+            # Process disparity to get depth information
+            self.process_disparity(disparity)
+
+            # Clear images to save memory
+            self.left_image = None
+            self.right_image = None
+
+    def process_disparity(self, disparity):
+        # Convert disparity to 3D points and detect objects
+        # This is a simplified example - real implementation would be more complex
+        height, width = disparity.shape
+
+        # Find regions of interest based on disparity
+        # (in practice, combine with 2D object detection)
+        valid_disparity = disparity[disparity > 0]
+
+        if len(valid_disparity) > 0:
+            avg_depth = np.mean(valid_disparity)
+            self.get_logger().info(f'Average depth: {avg_depth:.2f} pixels')
+
+def main(args=None):
+    rclpy.init(args=args)
+    stereo_node = StereoPerceptionNode()
+
+    try:
+        rclpy.spin(stereo_node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stereo_node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## Manipulation Planning
+
+### Isaac Manipulation Packages
+
+Isaac ROS provides manipulation capabilities through:
+
+- **Isaac ROS Manipulator**: Motion planning for robotic arms
+- **Isaac ROS Grasp Pose Estimation**: Object grasp planning
+- **Isaac ROS Motion Generation**: Trajectory generation and execution
+
+### Grasp Pose Estimation
+
+Here's an example of grasp pose estimation:
+
+```python
+# grasp_pose_estimator.py
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import PoseStamped, PoseArray
+from sensor_msgs.msg import PointCloud2
+from std_msgs.msg import String
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+
+class GraspPoseEstimator(Node):
+    def __init__(self):
+        super().__init__('grasp_pose_estimator')
+
+        # Subscribe to point cloud from depth camera
+        self.pointcloud_subscription = self.create_subscription(
+            PointCloud2,
+            '/camera/depth/points',
+            self.pointcloud_callback,
+            10
+        )
+
+        # Subscribe to object detections
+        self.detections_subscription = self.create_subscription(
+            Detection3DArray,
+            '/object_detections_3d',
+            self.detections_callback,
+            10
+        )
+
+        # Publisher for grasp poses
+        self.grasp_poses_publisher = self.create_publisher(
+            PoseArray,
+            '/candidate_grasp_poses',
+            10
+        )
+
+        self.status_publisher = self.create_publisher(
+            String,
+            '/grasp_estimator_status',
+            10
+        )
+
+        self.get_logger().info('Grasp Pose Estimator initialized')
+
+    def detections_callback(self, msg):
+        # For each detected object, estimate possible grasp poses
+        grasp_poses = PoseArray()
+        grasp_poses.header.frame_id = 'camera_link'
+        grasp_poses.header.stamp = self.get_clock().now().to_msg()
+
+        for detection in msg.detections:
+            # Estimate grasp poses for this object
+            object_center = detection.bbox.center.position
+            object_size = detection.bbox.size
+
+            # Generate candidate grasp poses around the object
+            candidate_poses = self.generate_grasp_candidates(
+                object_center, object_size
+            )
+
+            grasp_poses.poses.extend(candidate_poses)
+
+        # Publish candidate grasp poses
+        self.grasp_poses_publisher.publish(grasp_poses)
+
+        # Publish status
+        status_msg = String()
+        status_msg.data = f'Generated {len(grasp_poses.poses)} grasp candidates'
+        self.status_publisher.publish(status_msg)
+
+    def generate_grasp_candidates(self, object_center, object_size):
+        """Generate candidate grasp poses around an object."""
+        poses = []
+
+        # Generate poses at different positions around the object
+        grasp_distance = max(object_size.x, object_size.y, object_size.z) * 0.7
+
+        for angle in np.linspace(0, 2*np.pi, 8):  # 8 positions around object
+            # Position grasp point at distance from object center
+            x = object_center.x + grasp_distance * np.cos(angle)
+            y = object_center.y + grasp_distance * np.sin(angle)
+            z = object_center.z
+
+            # Create grasp pose
+            pose = Pose()
+            pose.position.x = x
+            pose.position.y = y
+            pose.position.z = z
+
+            # Orient gripper to face the object
+            direction_to_object = np.array([
+                object_center.x - x,
+                object_center.y - y,
+                object_center.z - z
+            ])
+            direction_to_object = direction_to_object / np.linalg.norm(direction_to_object)
+
+            # Simple orientation - point gripper toward object
+            # In practice, use more sophisticated grasp planning
+            rotation = R.from_rotvec(np.pi * np.array([0, 0, 1]))  # Rotate 180 degrees around Z
+            quat = rotation.as_quat()
+            pose.orientation.x = quat[0]
+            pose.orientation.y = quat[1]
+            pose.orientation.z = quat[2]
+            pose.orientation.w = quat[3]
+
+            poses.append(pose)
+
+        return poses
+
+    def pointcloud_callback(self, msg):
+        # Process point cloud data if needed
+        # This could be used for more sophisticated grasp planning
+        pass
+
+def main(args=None):
+    rclpy.init(args=args)
+    estimator = GraspPoseEstimator()
+
+    try:
+        rclpy.spin(estimator)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        estimator.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## Perception-Action Integration
+
+### Object Manipulation Pipeline
+
+Here's how to integrate perception and manipulation for object manipulation:
+
+```python
+# object_manipulation_pipeline.py
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import PoseStamped, Point
+from sensor_msgs.msg import Image
+from vision_msgs.msg import Detection3DArray
+from std_msgs.msg import String
+from action_msgs.msg import GoalStatus
+from control_msgs.action import FollowJointTrajectory
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+import numpy as np
+import time
+
+class ObjectManipulationPipeline(Node):
+    def __init__(self):
+        super().__init__('object_manipulation_pipeline')
+
+        # Subscribe to perception results
+        self.detections_subscription = self.create_subscription(
+            Detection3DArray,
+            '/object_detections_3d',
+            self.detections_callback,
+            10
+        )
+
+        # Publishers for manipulation commands
+        self.target_publisher = self.create_publisher(
+            Point,
+            '/manipulation_target',
+            10
+        )
+
+        self.status_publisher = self.create_publisher(
+            String,
+            '/manipulation_status',
+            10
+        )
+
+        # Action client for trajectory execution
+        self.trajectory_client = ActionClient(
+            self, FollowJointTrajectory, '/joint_trajectory_controller/follow_joint_trajectory'
+        )
+
+        self.current_state = 'idle'  # idle, detecting, planning, executing, completed
+        self.target_object = None
+
+        self.get_logger().info('Object Manipulation Pipeline initialized')
+
+    def detections_callback(self, msg):
+        if self.current_state == 'idle':
+            # Look for target objects to manipulate
+            for detection in msg.detections:
+                if self.is_target_object(detection):
+                    self.target_object = detection
+                    self.current_state = 'planning'
+                    self.plan_manipulation()
+                    break
+
+    def is_target_object(self, detection):
+        """Determine if this detection is a target object for manipulation."""
+        # In practice, use object classification
+        # For this example, assume any red object is a target
+        for result in detection.results:
+            if result.id == 'red_object' and result.score > 0.7:
+                return True
+        return False
+
+    def plan_manipulation(self):
+        """Plan manipulation trajectory to reach the target object."""
+        if self.target_object is None:
+            return
+
+        # Get target position
+        target_pos = self.target_object.bbox.center.position
+
+        # Publish target for visualization
+        target_point = Point()
+        target_point.x = target_pos.x
+        target_point.y = target_pos.y
+        target_point.z = target_pos.z
+        self.target_publisher.publish(target_point)
+
+        # Plan trajectory to reach the object
+        trajectory = self.generate_reach_trajectory(target_pos)
+
+        # Execute trajectory
+        self.execute_trajectory(trajectory)
+
+    def generate_reach_trajectory(self, target_pos):
+        """Generate trajectory to reach the target position."""
+        # This is a simplified example
+        # In practice, use motion planning libraries like MoveIt2
+
+        trajectory = JointTrajectory()
+        trajectory.joint_names = ['joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6']
+
+        # Current position (placeholder)
+        current_point = JointTrajectoryPoint()
+        current_point.positions = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        current_point.time_from_start.sec = 0
+        current_point.time_from_start.nanosec = 0
+
+        # Target position (calculated from target_pos)
+        target_point = JointTrajectoryPoint()
+        # This would involve inverse kinematics in practice
+        target_point.positions = [0.5, 0.3, -0.2, 0.1, 0.4, -0.1]  # Placeholder values
+        target_point.time_from_start.sec = 2
+        target_point.time_from_start.nanosec = 0
+
+        trajectory.points = [current_point, target_point]
+
+        return trajectory
+
+    def execute_trajectory(self, trajectory):
+        """Execute the planned trajectory."""
+        goal_msg = FollowJointTrajectory.Goal()
+        goal_msg.trajectory = trajectory
+
+        # Wait for action server
+        self.trajectory_client.wait_for_server()
+
+        # Send goal
+        self.current_state = 'executing'
+        future = self.trajectory_client.send_goal_async(goal_msg)
+        future.add_done_callback(self.trajectory_execute_callback)
+
+    def trajectory_execute_callback(self, future):
+        """Handle trajectory execution result."""
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Trajectory goal rejected')
+            self.current_state = 'idle'
+            return
+
+        self.get_logger().info('Trajectory goal accepted')
+
+        # Wait for result
+        result_future = goal_handle.get_result_async()
+        result_future.add_done_callback(self.trajectory_result_callback)
+
+    def trajectory_result_callback(self, future):
+        """Handle trajectory execution result."""
+        result = future.result().result
+        status = future.result().status
+
+        if status == GoalStatus.STATUS_SUCCEEDED:
+            self.get_logger().info('Trajectory execution succeeded')
+            # In a real implementation, you would now grasp the object
+        else:
+            self.get_logger().info(f'Trajectory execution failed with status: {status}')
+
+        self.current_state = 'idle'
+
+        # Publish status
+        status_msg = String()
+        status_msg.data = f'Trajectory execution: {status}'
+        self.status_publisher.publish(status_msg)
+
+def main(args=None):
+    rclpy.init(args=args)
+    pipeline = ObjectManipulationPipeline()
+
+    try:
+        rclpy.spin(pipeline)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        pipeline.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## Jetson Deployment
+
+### Optimizing for Edge Deployment
+
+When deploying perception systems on NVIDIA Jetson:
+
+1. **Model optimization**: Use TensorRT for inference acceleration
+2. **Resource management**: Monitor GPU memory and power consumption
+3. **Thermal management**: Implement thermal throttling protection
+4. **Real-time performance**: Optimize for consistent frame rates
+
+### Jetson-Specific Perception Pipeline
+
+```python
+# jetson_perception.py
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Image
+from vision_msgs.msg import Detection2DArray
+from std_msgs.msg import String
+import jetson.inference
+import jetson.utils
+import cv2
+import numpy as np
+
+class JetsonPerceptionNode(Node):
+    def __init__(self):
+        super().__init__('jetson_perception_node')
+
+        # Subscribe to camera feed
+        self.image_subscription = self.create_subscription(
+            Image,
+            '/camera/color/image_raw',
+            self.image_callback,
+            10
+        )
+
+        # Publishers
+        self.detections_publisher = self.create_publisher(
+            Detection2DArray,
+            '/jetson_detections',
+            10
+        )
+
+        self.status_publisher = self.create_publisher(
+            String,
+            '/jetson_perception_status',
+            10
+        )
+
+        # Initialize Jetson inference engine
+        try:
+            self.net = jetson.inference.detectNet("ssd-mobilenet-v2", threshold=0.5)
+            self.get_logger().info('Jetson detection network loaded successfully')
+        except Exception as e:
+            self.get_logger().error(f'Failed to load Jetson detection network: {e}')
+            self.net = None
+
+        # FPS tracking
+        self.frame_count = 0
+        self.start_time = time.time()
+
+        self.get_logger().info('Jetson Perception Node initialized')
+
+    def image_callback(self, msg):
+        if self.net is None:
+            return
+
+        # Convert ROS Image to CUDA image
+        cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+
+        # Convert to CUDA memory
+        cuda_img = jetson.utils.cudaFromNumpy(cv_image)
+
+        # Perform detection
+        detections = self.net.Detect(cuda_img)
+
+        # Convert detections to ROS format
+        ros_detections = Detection2DArray()
+        ros_detections.header = msg.header
+
+        for detection in detections:
+            ros_detection = Detection2D()
+            ros_detection.bbox.center.x = detection.Center[0]
+            ros_detection.bbox.center.y = detection.Center[1]
+            ros_detection.bbox.size_x = detection.Width
+            ros_detection.bbox.size_y = detection.Height
+
+            # Add classification result
+            hypothesis = ObjectHypothesisWithPose()
+            hypothesis.id = self.net.GetClassDesc(detection.ClassID)
+            hypothesis.score = detection.Confidence
+            ros_detection.results.append(hypothesis)
+
+            ros_detections.detections.append(ros_detection)
+
+        # Publish detections
+        self.detections_publisher.publish(ros_detections)
+
+        # Update FPS
+        self.frame_count += 1
+        if self.frame_count % 30 == 0:
+            elapsed = time.time() - self.start_time
+            fps = self.frame_count / elapsed
+            self.get_logger().info(f'Perception FPS: {fps:.2f}')
+
+            # Publish status
+            status_msg = String()
+            status_msg.data = f'Detected {len(detections)} objects at {fps:.2f} FPS'
+            self.status_publisher.publish(status_msg)
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = JetsonPerceptionNode()
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## Best Practices for Perception Systems
+
+### Robustness Considerations
+
+1. **Multi-sensor fusion**: Combine data from multiple sensors for robustness
+2. **Uncertainty modeling**: Account for sensor noise and uncertainty
+3. **Failure handling**: Implement graceful degradation when perception fails
+4. **Validation**: Continuously validate perception results
+
+### Performance Optimization
+
+1. **Efficient algorithms**: Use algorithms optimized for real-time performance
+2. **Hardware acceleration**: Leverage GPU and specialized AI accelerators
+3. **Pipeline optimization**: Optimize the entire perception pipeline
+4. **Memory management**: Efficiently manage memory for large datasets
+
+## Summary
+
+In this chapter, we've explored AI-powered perception and manipulation systems for humanoid robots:
+
+- Implemented Isaac ROS perception pipelines
+- Created 3D perception systems for object detection and localization
+- Planned and executed manipulation tasks
+- Integrated perception and manipulation for complex tasks
+- Deployed perception systems on NVIDIA Jetson platforms
+
+Perception and manipulation are critical capabilities for autonomous humanoid robots. The Isaac ROS ecosystem provides powerful tools for developing these capabilities, enabling robots to understand their environment and interact with objects effectively.
+
+## Exercises
+
+1. Implement a 3D object detection pipeline using Isaac ROS Stereo DNN
+2. Create a grasp pose estimator for simple geometric objects
+3. Deploy a perception system on NVIDIA Jetson and measure performance
+4. Integrate perception and manipulation for a pick-and-place task
+
+## References
+
+- [Isaac ROS Perception Packages](https://github.com/NVIDIA-ISAAC-ROS)
+- [ROS 2 Vision Messages](https://github.com/ros-perception/vision_msgs)
+- [NVIDIA Jetson Inference](https://github.com/dusty-nv/jetson-inference)
+
+## Next Chapter
+
+In the next chapter, we'll explore reinforcement learning control for humanoid robots, learning how to train AI agents for complex locomotion and manipulation tasks.

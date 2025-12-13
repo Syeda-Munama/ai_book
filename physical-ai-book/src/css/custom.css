@@ -1,0 +1,108 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #8A2BE2; /* Neon purple */
+  --ifm-color-primary-dark: #7A1BD2;
+  --ifm-color-primary-darker: #6F1AC8;
+  --ifm-color-primary-darkest: #5A15A3;
+  --ifm-color-primary-light: #9A3CF2;
+  --ifm-color-primary-lighter: #A44BF7;
+  --ifm-color-primary-lightest: #C284FF;
+  --ifm-color-secondary: #00BFFF; /* Neon blue */
+  --ifm-color-secondary-dark: #00AEEF;
+  --ifm-color-secondary-darker: #00A5E5;
+  --ifm-color-secondary-darkest: #0087BA;
+  --ifm-color-secondary-light: #18CEFF;
+  --ifm-color-secondary-lighter: #27D3FF;
+  --ifm-color-secondary-lightest: #63E0FF;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(138, 43, 226, 0.1); /* Neon purple tint */
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  --ifm-color-primary: #BA55D3; /* Lighter neon purple for dark mode */
+  --ifm-color-primary-dark: #A944C2;
+  --ifm-color-primary-darker: #9E3FB7;
+  --ifm-color-primary-darkest: #7F3292;
+  --ifm-color-primary-light: #CA66E4;
+  --ifm-color-primary-lighter: #D47BE9;
+  --ifm-color-primary-lightest: #E5A5F2;
+  --ifm-color-secondary: #00CED1; /* Darker neon blue for dark mode */
+  --ifm-color-secondary-dark: #00B5B8;
+  --ifm-color-secondary-darker: #00A7A9;
+  --ifm-color-secondary-darkest: #008587;
+  --ifm-color-secondary-light: #19DFE2;
+  --ifm-color-secondary-lighter: #2CE5E8;
+  --ifm-color-secondary-lightest: #66F0F2;
+  --docusaurus-highlighted-code-line-bg: rgba(186, 85, 211, 0.3); /* Neon purple tint */
+}
+
+/* Additional neon styling for interactive elements */
+.navbar {
+  background: linear-gradient(135deg, #8A2BE2 0%, #00BFFF 100%);
+  box-shadow: 0 4px 20px rgba(138, 43, 226, 0.3);
+}
+
+.navbar__link:hover,
+.navbar__link--active {
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+}
+
+.button {
+  transition: all 0.3s ease;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(138, 43, 226, 0.4);
+}
+
+/* Neon glow effect for important elements */
+.card {
+  border: 1px solid var(--ifm-color-primary-lighter);
+  box-shadow: 0 4px 15px rgba(138, 43, 226, 0.2);
+  transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 6px 20px rgba(138, 43, 226, 0.4),
+              0 0 15px rgba(138, 43, 226, 0.3) inset;
+}
+
+/* Enhanced code block styling with neon theme */
+code {
+  background-color: rgba(138, 43, 226, 0.05);
+  border-color: rgba(138, 43, 226, 0.2);
+}
+
+a {
+  text-shadow: 0 0 2px currentColor;
+}
+
+/* Custom styling for sidebar */
+.menu__list-item-collapsible:hover {
+  background-color: rgba(138, 43, 226, 0.1);
+}
+
+/* Enhanced table styling */
+table {
+  border: 1px solid var(--ifm-color-primary-lighter);
+}
+
+table th {
+  background-color: rgba(138, 43, 226, 0.1);
+}
+
+/* Special styling for headings */
+h1, h2, h3, h4, h5, h6 {
+  background: linear-gradient(to right, var(--ifm-color-primary), var(--ifm-color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

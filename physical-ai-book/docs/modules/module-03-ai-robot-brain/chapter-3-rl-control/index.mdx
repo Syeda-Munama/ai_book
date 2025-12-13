@@ -1,0 +1,883 @@
+---
+sidebar_position: 3
+slug: /module-03-ai-robot-brain/chapter-3-rl-control
+title: Chapter 3 - Reinforcement Learning Control
+---
+
+# Chapter 3: Reinforcement Learning Control
+
+In this chapter, we'll explore how to implement reinforcement learning (RL) for humanoid robot control using the NVIDIA Isaac ecosystem. You'll learn to train AI agents for complex locomotion, manipulation, and navigation tasks that enable humanoid robots to learn from interaction with their environment.
+
+## Learning Objectives
+
+By the end of this chapter, you will be able to:
+
+- Understand the fundamentals of reinforcement learning for robotics
+- Set up Isaac Gym for RL training with physics simulation
+- Train humanoid locomotion policies using RL algorithms
+- Implement manipulation control with RL for dexterous tasks
+- Deploy trained RL policies to real robots using sim-to-real transfer
+
+## Introduction to Reinforcement Learning for Robotics
+
+Reinforcement learning is particularly well-suited for robotics because it:
+
+1. **Learns from interaction**: No need for explicit programming of every behavior
+2. **Handles complex dynamics**: Can learn to control complex, high-DOF robots
+3. **Adapts to environments**: Learns to cope with different terrains and conditions
+4. **Generalizes across tasks**: Can transfer learned skills to similar tasks
+
+For humanoid robots, RL can learn complex behaviors like:
+
+- **Bipedal locomotion**: Walking, running, and balance control
+- **Manipulation**: Grasping, tool use, and dexterous manipulation
+- **Navigation**: Path planning and obstacle avoidance
+- **Human-robot interaction**: Social behaviors and collaboration
+
+## Isaac Gym Fundamentals
+
+### Introduction to Isaac Gym
+
+Isaac Gym is NVIDIA's GPU-accelerated RL environment that provides:
+
+- **Parallel simulation**: Train thousands of agents simultaneously
+- **Physics simulation**: Accurate physics with PhysX
+- **RL frameworks**: Integration with popular RL libraries
+- **Synthetic data**: Generate large amounts of training data
+
+### Installation and Setup
+
+Install Isaac Gym and required dependencies:
+
+```bash
+# Install Isaac Gym (requires NVIDIA developer account)
+pip install isaacgym
+
+# Install RL libraries
+pip install torch torchvision torchaudio
+pip install stable-baselines3[extra]
+pip install gymnasium
+```
+
+### Basic Isaac Gym Concepts
+
+- **Environments**: Physics simulation environments where agents learn
+- **Agents**: RL policies that interact with environments
+- **Observations**: Sensor data and state information provided to agents
+- **Actions**: Motor commands sent by agents to control robots
+- **Rewards**: Feedback signals that guide learning
+- **Episodes**: Complete interaction sequences from start to finish
+
+## Setting Up RL Training Environment
+
+### Environment Definition
+
+Here's how to define an RL environment for humanoid control:
+
+```python
+# humanoid_rl_env.py
+import gymnasium as gym
+from gymnasium import spaces
+import numpy as np
+import torch
+import omni
+from omni.isaac.core import World
+from omni.isaac.core.utils.stage import add_reference_to_stage
+from omni.isaac.core.utils.nucleus import get_assets_root_path
+from pxr import Gf
+
+class HumanoidRLEnv(gym.Env):
+    """Custom RL environment for humanoid robot control."""
+
+    def __init__(self, render=False):
+        super(HumanoidRLEnv, self).__init__()
+
+        # Initialize Isaac Sim world
+        self.world = World(stage_units_in_meters=1.0)
+        self.render = render
+
+        # Define action and observation spaces
+        # 19 DOF for a simple humanoid (12 for legs, 6 for arms, 1 for torso)
+        self.action_space = spaces.Box(
+            low=-1.0, high=1.0, shape=(19,), dtype=np.float32
+        )
+
+        # Observation space: joint positions, velocities, IMU data, target position
+        obs_dim = 19 * 2 + 6 + 3  # 19 joint pos + 19 joint vel + 6 IMU + 3 target
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
+        )
+
+        # Robot parameters
+        self.target_position = np.array([2.0, 0.0, 0.0])  # Target location
+        self.max_episode_steps = 1000
+        self.current_step = 0
+
+        # Initialize robot in simulation
+        self.setup_robot()
+
+    def setup_robot(self):
+        """Set up the humanoid robot in Isaac Sim."""
+        # Add ground plane
+        self.world.scene.add_default_ground_plane()
+
+        # Add robot (using sample asset for demonstration)
+        assets_root_path = get_assets_root_path()
+        if assets_root_path:
+            robot_path = assets_root_path + "/Isaac/Robots/Humanoid/humanoid_instanceable.usd"
+            add_reference_to_stage(usd_path=robot_path, prim_path="/World/Humanoid")
+
+        # Reset the world
+        self.world.reset()
+
+    def reset(self, seed=None, options=None):
+        """Reset the environment to initial state."""
+        super().reset(seed=seed)
+
+        # Reset simulation
+        self.world.reset()
+        self.current_step = 0
+
+        # Randomize target position
+        angle = np.random.uniform(0, 2 * np.pi)
+        distance = np.random.uniform(1.0, 3.0)
+        self.target_position = np.array([
+            distance * np.cos(angle),
+            distance * np.sin(angle),
+            0.0
+        ])
+
+        # Get initial observation
+        observation = self.get_observation()
+        info = {}
+
+        return observation, info
+
+    def step(self, action):
+        """Execute one step of the environment."""
+        # Apply action to robot
+        self.apply_action(action)
+
+        # Step simulation
+        self.world.step(render=self.render)
+
+        # Get observation
+        observation = self.get_observation()
+
+        # Calculate reward
+        reward = self.calculate_reward()
+
+        # Check if episode is done
+        terminated = self.check_termination()
+        truncated = self.current_step >= self.max_episode_steps
+
+        # Update step counter
+        self.current_step += 1
+
+        info = {}
+
+        return observation, reward, terminated, truncated, info
+
+    def apply_action(self, action):
+        """Apply action to the robot."""
+        # In practice, this would interface with the robot's control system
+        # For this example, we'll just log the action
+        pass
+
+    def get_observation(self):
+        """Get current observation from the environment."""
+        # This would typically get joint positions, velocities, IMU data, etc.
+        # For this example, we'll return a placeholder observation
+        obs = np.random.randn(self.observation_space.shape[0]).astype(np.float32)
+        return obs
+
+    def calculate_reward(self):
+        """Calculate reward based on current state."""
+        # Simple reward: positive for moving toward target, negative for falling
+        reward = 0.0
+
+        # Get current robot position (simplified)
+        robot_pos = np.array([0.0, 0.0, 0.0])  # Placeholder
+
+        # Distance to target
+        dist_to_target = np.linalg.norm(self.target_position - robot_pos[:2])
+
+        # Reward for moving toward target
+        reward += (1.0 - min(dist_to_target, 1.0)) * 10.0
+
+        # Penalty for falling (simplified)
+        robot_height = robot_pos[2]  # Z position
+        if robot_height < 0.5:  # Robot is falling
+            reward -= 10.0
+
+        return reward
+
+    def check_termination(self):
+        """Check if episode should terminate."""
+        # Terminate if robot falls
+        robot_pos = np.array([0.0, 0.0, 0.0])  # Placeholder
+        robot_height = robot_pos[2]
+
+        if robot_height < 0.3:  # Robot has fallen
+            return True
+
+        return False
+
+    def close(self):
+        """Clean up environment."""
+        self.world.clear()
+```
+
+### Training Loop Implementation
+
+Here's a complete training loop for the humanoid environment:
+
+```python
+# train_humanoid_rl.py
+import torch
+import numpy as np
+from stable_baselines3 import PPO
+from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.callbacks import EvalCallback
+import os
+
+def train_humanoid_policy():
+    """Train a humanoid locomotion policy using PPO."""
+
+    # Create vectorized environment for parallel training
+    # Isaac Gym allows for thousands of parallel environments
+    env = make_vec_env(HumanoidRLEnv, n_envs=64)  # 64 parallel environments
+
+    # Create PPO agent
+    model = PPO(
+        "MlpPolicy",
+        env,
+        verbose=1,
+        tensorboard_log="./logs/humanoid_ppo/",
+        learning_rate=3e-4,
+        n_steps=2048,  # Number of steps to collect for each policy update
+        batch_size=64,  # Minibatch size
+        n_epochs=10,    # Number of epochs when optimizing the surrogate
+        gamma=0.99,     # Discount factor
+        gae_lambda=0.95, # Factor for trade-off of bias vs variance for Generalized Advantage Estimator
+        clip_range=0.2, # Clipping parameter
+        ent_coef=0.0,   # Entropy coefficient for the loss calculation
+    )
+
+    # Training parameters
+    total_timesteps = 1000000  # 1M timesteps
+
+    # Train the model
+    model.learn(
+        total_timesteps=total_timesteps,
+        log_interval=10,  # Log every 10 policy updates
+        progress_bar=True
+    )
+
+    # Save the trained model
+    model.save("humanoid_ppo_policy")
+
+    # Evaluate the trained policy
+    obs = env.reset()
+    for i in range(1000):
+        action, _states = model.predict(obs)
+        obs, rewards, dones, info = env.step(action)
+
+        if dones:
+            obs = env.reset()
+
+    return model
+
+if __name__ == "__main__":
+    trained_model = train_humanoid_policy()
+```
+
+## Locomotion Control with RL
+
+### Bipedal Walking Policy
+
+Training a humanoid to walk involves teaching it to:
+
+1. **Maintain balance**: Keep center of mass over support polygon
+2. **Generate stepping patterns**: Coordinate legs for forward motion
+3. **Adapt to terrain**: Adjust gait for different surfaces
+4. **Recover from disturbances**: Maintain stability when pushed
+
+```python
+# bipedal_locomotion.py
+import torch
+import torch.nn as nn
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+import numpy as np
+
+class BipedalLocomotionEnv(gym.Env):
+    """Environment for training bipedal locomotion."""
+
+    def __init__(self):
+        super(BipedalLocomotionEnv, self).__init__()
+
+        # Action space: joint torques for humanoid
+        self.action_space = spaces.Box(
+            low=-1.0, high=1.0, shape=(12,), dtype=np.float32  # 6 joints per leg
+        )
+
+        # Observation space includes proprioceptive and exteroceptive information
+        obs_dim = (12 * 2 +  # joint positions and velocities
+                  6 +        # IMU readings (orientation + angular velocity)
+                  3 +        # linear velocity
+                  1 +        # height
+                  3)         # target direction
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
+        )
+
+        # Walking parameters
+        self.target_velocity = 1.0  # m/s
+        self.current_velocity = 0.0
+        self.episode_length = 500
+        self.step_count = 0
+
+    def reset(self, seed=None, options=None):
+        # Reset robot to standing position
+        # In practice, this would reset the Isaac Sim environment
+        self.step_count = 0
+        self.current_velocity = 0.0
+
+        # Generate random observation for demonstration
+        obs = np.random.randn(self.observation_space.shape[0]).astype(np.float32)
+        return obs, {}
+
+    def step(self, action):
+        # Apply action to robot
+        # In practice, this would interface with Isaac Sim physics
+        action = np.clip(action, -1.0, 1.0)
+
+        # Get new observation
+        obs = np.random.randn(self.observation_space.shape[0]).astype(np.float32)
+
+        # Calculate reward for locomotion
+        reward = self.calculate_locomotion_reward(action)
+
+        # Check termination conditions
+        terminated = self.check_fall()
+        truncated = self.step_count >= self.episode_length
+
+        self.step_count += 1
+
+        return obs, reward, terminated, truncated, {}
+
+    def calculate_locomotion_reward(self, action):
+        """Calculate reward for bipedal locomotion."""
+        reward = 0.0
+
+        # Reward for forward velocity
+        forward_vel = self.current_velocity  # Simplified
+        reward += forward_vel * 10.0
+
+        # Penalty for action magnitude (energy efficiency)
+        action_penalty = np.sum(np.square(action)) * 0.01
+        reward -= action_penalty
+
+        # Reward for maintaining upright posture
+        upright_reward = 1.0  # Simplified
+        reward += upright_reward
+
+        # Penalty for deviation from target velocity
+        vel_error = abs(self.target_velocity - forward_vel)
+        reward -= vel_error * 2.0
+
+        return reward
+
+    def check_fall(self):
+        """Check if humanoid has fallen."""
+        # In practice, this would check robot orientation and position
+        return False  # Simplified
+
+# Custom policy network for locomotion
+class LocomotionPolicy(nn.Module):
+    def __init__(self, obs_dim, action_dim):
+        super(LocomotionPolicy, self).__init__()
+
+        self.actor = nn.Sequential(
+            nn.Linear(obs_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, action_dim),
+            nn.Tanh()
+        )
+
+        self.critic = nn.Sequential(
+            nn.Linear(obs_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )
+
+    def forward(self, obs):
+        action = self.actor(obs)
+        value = self.critic(obs)
+        return action, value
+```
+
+### Advanced Locomotion Techniques
+
+For more sophisticated locomotion, consider:
+
+1. **Phase-based control**: Use gait phase information
+2. **Hierarchical control**: High-level planning with low-level execution
+3. **Adaptive control**: Adjust to different terrains and conditions
+4. **Robust control**: Handle disturbances and uncertainties
+
+## Manipulation Control with RL
+
+### Dexterous Manipulation
+
+Training for manipulation tasks involves:
+
+1. **Hand control**: Coordinated finger movements
+2. **Grasp planning**: Learning stable grasps
+3. **Tool use**: Using objects as tools
+4. **Bimanual coordination**: Using both hands together
+
+```python
+# manipulation_rl.py
+class ManipulationEnv(gym.Env):
+    """Environment for training manipulation skills."""
+
+    def __init__(self):
+        super(ManipulationEnv, self).__init__()
+
+        # Action space for manipulator (e.g., 7-DOF arm)
+        self.action_space = spaces.Box(
+            low=-1.0, high=1.0, shape=(7,), dtype=np.float32
+        )
+
+        # Observation space for manipulation
+        obs_dim = (7 * 2 +    # joint positions and velocities
+                  6 +         # end-effector pose and velocity
+                  3 +         # object position
+                  3 +         # object orientation
+                  6 +         # contact forces/torques
+                  3)          # target position
+        self.observation_space = spaces.Box(
+            low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32
+        )
+
+        # Task parameters
+        self.object_pos = np.array([0.5, 0.0, 0.1])  # Initial object position
+        self.target_pos = np.array([0.6, 0.1, 0.2])  # Target position
+        self.max_steps = 1000
+        self.step_count = 0
+
+    def reset(self, seed=None, options=None):
+        # Reset environment to initial state
+        self.step_count = 0
+        self.object_pos = np.array([0.5, 0.0, 0.1])
+        self.target_pos = np.array([0.6, 0.1, 0.2])
+
+        # Generate observation
+        obs = self.get_observation()
+        return obs, {}
+
+    def step(self, action):
+        # Apply action to manipulator
+        action = np.clip(action, -1.0, 1.0)
+
+        # Simulate manipulation step
+        self.update_manipulator(action)
+
+        # Get new observation
+        obs = self.get_observation()
+
+        # Calculate reward
+        reward = self.calculate_manipulation_reward()
+
+        # Check termination
+        terminated = self.check_success() or self.check_failure()
+        truncated = self.step_count >= self.max_steps
+
+        self.step_count += 1
+
+        return obs, reward, terminated, truncated, {}
+
+    def calculate_manipulation_reward(self):
+        """Calculate reward for manipulation task."""
+        reward = 0.0
+
+        # Distance to object (for grasping)
+        ee_pos = np.array([0.0, 0.0, 0.0])  # End-effector position (simplified)
+        obj_dist = np.linalg.norm(ee_pos - self.object_pos)
+        reward += max(0, 1.0 - obj_dist) * 10.0  # Positive reward for getting close
+
+        # Object lifting reward
+        if self.object_pos[2] > 0.15:  # Object is lifted
+            reward += 50.0
+
+        # Distance to target (for placing)
+        if self.object_pos[2] > 0.15:  # Only if object is lifted
+            target_dist = np.linalg.norm(self.object_pos - self.target_pos)
+            reward += max(0, 1.0 - target_dist) * 20.0
+
+        # Penalty for large actions
+        reward -= 0.01  # Small time penalty
+
+        return reward
+
+    def check_success(self):
+        """Check if manipulation task was successful."""
+        # Success: object is placed at target position
+        dist_to_target = np.linalg.norm(self.object_pos - self.target_pos)
+        return dist_to_target < 0.05 and self.object_pos[2] < 0.15  # On target and placed down
+
+    def check_failure(self):
+        """Check if manipulation task failed."""
+        # Failure: robot fell, object dropped in wrong place, etc.
+        return False  # Simplified
+
+    def get_observation(self):
+        """Get current observation."""
+        # In practice, this would get real sensor data from Isaac Sim
+        return np.random.randn(self.observation_space.shape[0]).astype(np.float32)
+
+    def update_manipulator(self, action):
+        """Update manipulator state based on action."""
+        # In practice, this would interface with Isaac Sim physics
+        pass
+```
+
+## Isaac Sim Integration for RL
+
+### Physics Simulation for RL Training
+
+Isaac Sim provides the physics simulation needed for RL training:
+
+```python
+# isaac_rl_integration.py
+import omni
+from omni.isaac.core import World
+from omni.isaac.core.utils.stage import add_reference_to_stage
+from omni.isaac.core.utils.nucleus import get_assets_root_path
+from omni.isaac.core.articulations import ArticulationView
+from omni.isaac.core.utils.prims import get_prim_at_path
+import numpy as np
+
+class IsaacRLInterface:
+    """Interface between RL algorithms and Isaac Sim."""
+
+    def __init__(self, num_envs=64, device="cuda:0"):
+        self.num_envs = num_envs
+        self.device = device
+
+        # Initialize multiple parallel environments in Isaac Sim
+        self.world = World(stage_units_in_meters=1.0)
+        self.envs = []
+        self.humanoids = []
+
+        self.setup_environments()
+
+    def setup_environments(self):
+        """Set up multiple parallel environments."""
+        # Add ground plane
+        self.world.scene.add_default_ground_plane()
+
+        # Create multiple humanoid instances
+        for i in range(self.num_envs):
+            # Calculate position for this environment instance
+            env_pos = np.array([
+                (i % 8) * 2.0,  # X position (8 environments per row)
+                (i // 8) * 2.0,  # Y position (rows)
+                0.0  # Z position
+            ])
+
+            # Add humanoid robot
+            assets_root_path = get_assets_root_path()
+            if assets_root_path:
+                robot_path = assets_root_path + "/Isaac/Robots/Humanoid/humanoid_instanceable.usd"
+                prim_path = f"/World/Humanoid_{i}"
+
+                add_reference_to_stage(
+                    usd_path=robot_path,
+                    prim_path=prim_path
+                )
+
+                # Create articulation view for control
+                humanoid = self.world.scene.add(
+                    ArticulationView(
+                        prim_path=prim_path,
+                        name=f"humanoid_{i}",
+                        reset_xform_properties=False
+                    )
+                )
+
+                self.humanoids.append(humanoid)
+
+        # Reset the world to initialize all robots
+        self.world.reset()
+
+    def get_observations(self):
+        """Get observations from all environments."""
+        observations = []
+
+        for humanoid in self.humanoids:
+            # Get joint positions and velocities
+            joint_positions = humanoid.get_joint_positions()
+            joint_velocities = humanoid.get_joint_velocities()
+
+            # Get base pose and velocity
+            root_pos, root_orn = humanoid.get_world_poses()
+            root_lin_vel, root_ang_vel = humanoid.get_velocities()
+
+            # Combine into observation
+            obs = np.concatenate([
+                joint_positions.flatten(),
+                joint_velocities.flatten(),
+                root_orn.flatten(),  # Orientation
+                root_ang_vel.flatten(),  # Angular velocity
+                root_lin_vel.flatten()   # Linear velocity
+            ])
+
+            observations.append(obs)
+
+        return np.array(observations)
+
+    def apply_actions(self, actions):
+        """Apply actions to all environments."""
+        for i, humanoid in enumerate(self.humanoids):
+            action = actions[i]
+            # Apply joint torques or position targets
+            # This depends on the control mode being used
+            humanoid.set_joint_efforts(action)
+
+    def step_simulation(self):
+        """Step the physics simulation."""
+        self.world.step(render=False)
+
+    def reset_environments(self):
+        """Reset all environments."""
+        self.world.reset()
+
+        # Randomize initial conditions for each environment
+        for humanoid in self.humanoids:
+            # Add random perturbations
+            pass
+```
+
+## Sim-to-Real Transfer
+
+### Domain Randomization
+
+Domain randomization helps with sim-to-real transfer by training on diverse conditions:
+
+```python
+# domain_randomization.py
+class DomainRandomization:
+    """Apply domain randomization to improve sim-to-real transfer."""
+
+    def __init__(self, env):
+        self.env = env
+        self.randomization_params = {
+            'mass_range': [0.8, 1.2],      # Randomize mass by ±20%
+            'friction_range': [0.5, 1.5],  # Randomize friction
+            'restitution_range': [0.0, 0.2], # Randomize bounciness
+            'gravity_range': [0.9, 1.1],   # Randomize gravity
+            'actuator_range': [0.9, 1.1],  # Randomize actuator strength
+        }
+
+    def randomize_dynamics(self):
+        """Randomize physical parameters."""
+        for param, (min_val, max_val) in self.randomization_params.items():
+            if param == 'mass_range':
+                # Randomize link masses
+                pass
+            elif param == 'friction_range':
+                # Randomize friction coefficients
+                pass
+            elif param == 'gravity_range':
+                # Randomize gravity (if supported by sim)
+                pass
+
+    def randomize_visual(self):
+        """Randomize visual appearance."""
+        # Randomize lighting, textures, colors
+        pass
+
+    def randomize_control(self):
+        """Randomize control parameters."""
+        # Add noise to actions, delay in control
+        pass
+```
+
+### Policy Deployment to Real Robots
+
+Deploying trained policies to real robots requires:
+
+1. **Sensor mapping**: Map simulation sensors to real sensors
+2. **Action scaling**: Scale simulation actions to real robot capabilities
+3. **Timing adjustment**: Account for real-time constraints
+4. **Safety measures**: Implement safety checks and limits
+
+```python
+# policy_deployment.py
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import JointState, Imu
+from geometry_msgs.msg import Twist
+from std_msgs.msg import Float32MultiArray
+import torch
+
+class PolicyDeploymentNode(Node):
+    """Node for deploying RL policy to real robot."""
+
+    def __init__(self):
+        super().__init__('policy_deployment_node')
+
+        # Load trained policy
+        self.policy = torch.load('humanoid_ppo_policy.pth')
+        self.policy.eval()
+
+        # Subscribe to robot sensors
+        self.joint_state_sub = self.create_subscription(
+            JointState,
+            '/joint_states',
+            self.joint_state_callback,
+            10
+        )
+
+        self.imu_sub = self.create_subscription(
+            Imu,
+            '/imu/data',
+            self.imu_callback,
+            10
+        )
+
+        # Publisher for joint commands
+        self.joint_cmd_pub = self.create_publisher(
+            Float32MultiArray,
+            '/joint_group_position_controller/commands',
+            10
+        )
+
+        # Robot state storage
+        self.joint_positions = None
+        self.joint_velocities = None
+        self.imu_data = None
+
+        # Control loop
+        self.control_timer = self.create_timer(0.02, self.control_callback)  # 50 Hz
+
+    def joint_state_callback(self, msg):
+        """Process joint state messages."""
+        self.joint_positions = np.array(msg.position)
+        self.joint_velocities = np.array(msg.velocity)
+
+    def imu_callback(self, msg):
+        """Process IMU messages."""
+        self.imu_data = {
+            'orientation': [msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w],
+            'angular_velocity': [msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z],
+            'linear_acceleration': [msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z]
+        }
+
+    def control_callback(self):
+        """Main control loop."""
+        if (self.joint_positions is not None and
+            self.joint_velocities is not None and
+            self.imu_data is not None):
+
+            # Create observation from real sensor data
+            obs = self.create_observation()
+
+            # Get action from policy (inference)
+            with torch.no_grad():
+                action_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+                action = self.policy(action_tensor).numpy()[0]
+
+            # Scale action to real robot limits
+            action_scaled = self.scale_action_to_robot(action)
+
+            # Publish joint commands
+            cmd_msg = Float32MultiArray()
+            cmd_msg.data = action_scaled.tolist()
+            self.joint_cmd_pub.publish(cmd_msg)
+
+    def create_observation(self):
+        """Create observation from real sensor data."""
+        # Combine joint positions, velocities, and IMU data
+        obs = np.concatenate([
+            self.joint_positions,
+            self.joint_velocities,
+            self.imu_data['orientation'],
+            self.imu_data['angular_velocity'],
+            self.imu_data['linear_acceleration']
+        ])
+        return obs
+
+    def scale_action_to_robot(self, action):
+        """Scale normalized action to real robot limits."""
+        # Convert from [-1, 1] to actual joint limits
+        # This requires knowledge of real robot joint limits
+        joint_limits = np.array([1.57, 1.57, 1.57, 1.57, 1.57, 1.57, 1.57])  # Example limits
+        return np.clip(action, -joint_limits, joint_limits)
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = PolicyDeploymentNode()
+
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## Best Practices for RL in Robotics
+
+### Training Best Practices
+
+1. **Curriculum learning**: Start with simple tasks, gradually increase complexity
+2. **Reward shaping**: Design rewards that guide learning toward desired behavior
+3. **Safety constraints**: Ensure safe exploration during training
+4. **Hyperparameter tuning**: Systematically tune learning parameters
+
+### Deployment Best Practices
+
+1. **Safety checks**: Implement safety limits and emergency stops
+2. **Gradual deployment**: Start with simple behaviors, expand gradually
+3. **Monitoring**: Continuously monitor robot behavior
+4. **Fallback behaviors**: Have safe default behaviors when policy fails
+
+## Summary
+
+In this chapter, we've explored reinforcement learning for humanoid robot control:
+
+- Understood RL fundamentals for robotics applications
+- Set up Isaac Gym for parallel RL training
+- Trained locomotion policies for bipedal walking
+- Implemented manipulation control with RL
+- Explored sim-to-real transfer techniques
+
+Reinforcement learning enables humanoid robots to learn complex behaviors through interaction with their environment. The Isaac ecosystem provides powerful tools for training and deploying RL policies, bridging the gap between simulation and real-world robotics.
+
+## Exercises
+
+1. Train a simple bipedal locomotion policy using Isaac Gym
+2. Implement domain randomization to improve sim-to-real transfer
+3. Deploy a trained policy to a simulated robot and evaluate performance
+4. Experiment with different RL algorithms (PPO, SAC, DDPG) for locomotion
+
+## References
+
+- [Isaac Gym Documentation](https://docs.omniverse.nvidia.com/isaacgym/latest/index.html)
+- [Stable Baselines3 Documentation](https://stable-baselines3.readthedocs.io/)
+- [Reinforcement Learning in Robotics](https://arxiv.org/abs/2103.13608)
+
+## Next Chapter
+
+In the final chapter of this module, we'll explore sim-to-real transfer in detail, learning how to bridge the gap between simulation and real-world deployment for AI-powered humanoid robots.
