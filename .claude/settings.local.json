@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch --all --prune)",
+      "Bash(.specify/scripts/powershell/create-new-feature.ps1 -Json \"Module 1: The Robotic Nervous System (ROS 2)\nTarget audience: University students with AI/CS background learning Physical AI for humanoid robotics\nFocus: Middleware for robot control, bridging Python AI agents to ROS controllers, URDF for humanoids; emphasize embodied intelligence in physical environments\nSuccess criteria:\n- Covers 4+ core ROS 2 concepts with practical examples\n- Includes 5+ code snippets testable in ROS 2 Humble on Ubuntu 22.04\n- Reader can build and launch a simple humanoid URDF node after reading\n- All technical claims supported by official ROS docs or tutorials\n- Integrates with hardware reqs (e.g., Jetson Orin for deployment)\nConstraints:\n- Chapter count: 4 chapters matching weeks 3-5 (e.g., Architecture, Nodes/Topics/Services, Python Packages, Launch/Params)\n- Word count per chapter: 1500-2500 words\n- Format: MDX with code blocks (Python/rclpy), Mermaid diagrams for node graphs, LaTeX for equations (e.g., transform math)\n- Sources: Official ROS 2 docs, tutorials; 5+ references per chapter, APA style\n- Timeline: Generate within 1 hour per spec\n- Assessments: 2 quizzes (multiple-choice on concepts), 3 exercises (e.g., build ROS package for humanoid joint control)\n- Diagrams: 3+ per chapter (e.g., ROS graph, URDF tree)\n- Exercises: Hands-on labs (e.g., simulate bipedal publisher/subscriber)\nNot building:\n- Full ROS 1 comparison\n- Advanced real-time extensions (e.g., ROS 2 real-time)\n- Vendor-specific hardware integrations beyond Jetson\n- Ethical discussions on robot control\" -Json -Number 1 -ShortName \"ros2-textbook\" \"Module 1: The Robotic Nervous System (ROS 2)\")",
+      "Bash(.specify/scripts/bash/setup-plan.sh --json)",
+      "Bash(.specify/scripts/bash/update-agent-context.sh claude)"
+    ]
+  }
+}
