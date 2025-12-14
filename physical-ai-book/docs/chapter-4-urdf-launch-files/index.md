@@ -11,10 +11,10 @@ After completing this chapter, you will be able to:
 - Build and launch a complete humanoid URDF model
 
 ## Table of Contents
-- [Advanced ROS 2 Concepts](./advanced.md)
-- [Integration of ROS 2 Components](./integration.md)
-- [Exercise: Complete Humanoid Control](./exercise3.md)
-- [Chapter Quiz](./quiz2.md)
+- [Advanced ROS 2 Concepts](#advanced-ros-2-concepts)
+- [Integration of ROS 2 Components](#integration-of-ros-2-components)
+- [Exercise: Complete Humanoid Control](#exercise-complete-humanoid-control)
+- [Chapter Quiz](#chapter-quiz)
 
 ---
-Next: [Advanced ROS 2 Concepts](./advanced.md)
+Next: [Advanced ROS 2 Concepts](#advanced-ros-2-concepts)
